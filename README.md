@@ -72,14 +72,13 @@
 
 ### 普通用户快速上手
 
-普通用户使用打包后的版本时，**不需要安装 Node.js**。
+普通用户只需要下载一个 `.exe` 文件，**不需要安装 Node.js，也不需要安装其他运行环境**。
 
-1. 前往 [GitHub Releases](https://github.com/huchengran0725-ctrl/lbxn/releases) 下载最新版本。
-2. 安装版：运行安装程序，安装完成后从桌面或开始菜单启动。
-3. 便携版：下载 `.exe` 文件后直接运行，无需安装。
-4. 小新启动后会停留在桌面，并在系统托盘保留入口。
+1. 前往 [Releases 下载页面](https://github.com/huchengran0725-ctrl/lbxn/releases/latest)。
+2. 下载 `Shinchan-Pet-1.0.0-Portable.exe`。
+3. 双击 `.exe`，小新就会出现在桌面上。
 
-如果 Releases 暂时没有可下载文件，说明当前仅发布了源码。此时需要按照下方“从源码运行”的步骤启动。
+> 提示：请下载 Releases 页面中的便携版 `.exe`，不要下载 GitHub 自动生成的 `Source code` 压缩包。源码压缩包是给开发者使用的，不能直接启动桌宠。
 
 ### 基本操作
 
@@ -118,7 +117,9 @@
 
 ## 从源码运行
 
-需要 Node.js 18 或更高版本。
+以下内容面向希望修改或参与开发的用户。普通用户无需执行这些命令。
+
+源码开发需要 Node.js 18 或更高版本。
 
 ```bash
 git clone https://github.com/huchengran0725-ctrl/lbxn.git
@@ -140,14 +141,21 @@ npm run build       # 构建渲染进程和 Electron 主进程
 npm start           # 构建并启动生产模式
 ```
 
-打包 Windows 安装版和便携版：
+只生成一个免安装、可直接运行的便携版 `.exe`：
 
 ```bash
-npm i -D electron-builder
+npm run dist:portable
+```
+
+同时生成安装版和便携版：
+
+```bash
 npm run dist
 ```
 
-生成文件位于 `release/` 目录。将安装版和便携版 `.exe` 上传到 GitHub Releases 后，普通用户即可直接下载使用。
+生成文件位于 `release/` 目录。将 `Shinchan-Pet-1.0.0-Portable.exe` 上传到 GitHub Releases 后，普通用户即可下载并直接运行。
+
+仓库包含 GitHub Actions 发布流程。维护者推送 `v1.0.0` 这类版本标签后，GitHub 会自动构建便携版 `.exe`、生成 SHA-256 校验文件并创建 Release。
 
 ## 本地数据
 

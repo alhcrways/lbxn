@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit",
     "build": "npm run build:main && vite build",
     "start": "npm run build:main && vite build && node scripts/launch.mjs",
-    "dist": "npm run build && electron-builder --win nsis portable"
+    "dist": "npm run build && electron-builder --win nsis portable",
+    "dist:portable": "npm run build && electron-builder --win portable"
   },
   "dependencies": {
     "@tabler/icons-react": "^3.24.0",
@@ -23,20 +24,21 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@types/node": "^22.10.2",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
-    "@types/node": "^22.10.2",
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.0",
     "cross-env": "^7.0.3",
     "electron": "^33.2.0",
+    "electron-builder": "^26.15.3",
     "esbuild": "^0.24.2",
     "typescript": "^5.7.2",
     "vite": "^5.4.11",
     "wait-on": "^8.0.1"
   },
   "comments": {
-    "packaging": "打包安装包时先执行: npm i -D electron-builder，再运行 npm run dist（electron-builder 体积较大，日常开发无需安装）"
+    "packaging": "npm run dist:portable 生成免安装单文件版本；npm run dist 同时生成安装版和便携版。"
   },
   "build": {
     "appId": "com.shinchan.pet",
@@ -57,8 +59,12 @@
       ]
     },
     "nsis": {
+      "artifactName": "Shinchan-Pet-${version}-Setup.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
+    },
+    "portable": {
+      "artifactName": "Shinchan-Pet-${version}-Portable.${ext}"
     }
   }
 }

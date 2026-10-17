@@ -7,7 +7,8 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const SIZE = 64;
+const BASE_SIZE = 64;
+const SIZE = 256;
 
 // ---- PNG 编码 ----
 const CRC_TABLE = (() => {
@@ -37,19 +38,19 @@ function chunk(type, data) {
 
 // ---- 绘制：橙色圆脸 + 眉毛 + 大黑眼 + 腮红 ----
 const px = (x, y, [r, g, b, a = 255]) => {
-  const i = (y * SIZE + x) * 4;
+  const i = (y * BASE_SIZE + x) * 4;
   raw[i] = r; raw[i + 1] = g; raw[i + 2] = b; raw[i + 3] = a;
 };
 
-const raw = Buffer.alloc(SIZE * SIZE * 4);
+const raw = Buffer.alloc(BASE_SIZE * BASE_SIZE * 4);
 
 const inCircle = (x, y, cx, cy, r) => (x - cx) ** 2 + (y - cy) ** 2 <= r * r;
 
-for (let y = 0; y < SIZE; y++) {
-  for (let x = 0; x < SIZE; x++) {
+for (let y = 0; y < BASE_SIZE; y++) {
+  for (let x = 0; x < BASE_SIZE; x++) {
     if (!inCircle(x + 0.5, y + 0.5, 32, 34, 30)) continue;
     // 主脸：橙红渐变
-    const t = (x + y) / (SIZE * 2);
+    const t = (x + y) / (BASE_SIZE * 2);
     const base = [Math.round(230 - 20 * t), Math.round(74 + 30 * t), 25];
     px(x, y, base);
     // 顶部高光弧
@@ -93,7 +94,13 @@ ihdr[8] = 8; // bit depth
 ihdr[9] = 6; // RGBA
 const scanlines = Buffer.alloc(SIZE * (SIZE * 4 + 1));
 for (let y = 0; y < SIZE; y++) {
-  raw.copy(scanlines, y * (SIZE * 4 + 1) + 1, y * SIZE * 4, (y + 1) * SIZE * 4);
+  const sourceY = Math.floor((y * BASE_SIZE) / SIZE);
+  const rowOffset = y * (SIZE * 4 + 1) + 1;
+  for (let x = 0; x < SIZE; x++) {
+    const sourceX = Math.floor((x * BASE_SIZE) / SIZE);
+    const sourceOffset = (sourceY * BASE_SIZE + sourceX) * 4;
+    raw.copy(scanlines, rowOffset + x * 4, sourceOffset, sourceOffset + 4);
+  }
 }
 const png = Buffer.concat([
   Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),

@@ -1,0 +1,50 @@
+name: Build and publish Windows release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows-portable:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check TypeScript
+        run: npm run typecheck
+
+      - name: Build portable executable
+        run: npm run dist:portable
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $asset = Get-ChildItem release -Filter "*-Portable.exe" | Select-Object -First 1
+          if (-not $asset) { throw "Portable executable was not generated." }
+
+          $checksumPath = "$($asset.FullName).sha256"
+          $hash = (Get-FileHash $asset.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $($asset.Name)" | Set-Content -NoNewline -Encoding ascii $checksumPath
+
+          gh release create $env:GITHUB_REF_NAME `
+            $asset.FullName `
+            $checksumPath `
+            --title "蜡笔小新桌宠 $env:GITHUB_REF_NAME" `
+            --notes "Windows 10/11 64 位便携版。下载 Portable.exe 后直接运行，无需安装 Node.js。"
