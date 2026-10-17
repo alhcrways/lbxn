@@ -1,0 +1,49 @@
+node_modules/
+dist/
+dist-electron/
+release/
+output/
+*.log
+.DS_Store
+
+# 本机配置与临时文件
+.env
+.env.*
+!.env.example
+electron_output.txt
+
+# 构建时生成
+assets/note-window.html
+
+# 当前 MVP 未启用的历史/实验素材（文件仍保留在本机）
+/小新.png
+/assets/note-mascots.png
+/src/renderer/components/PixelCharacter.tsx
+/src/shared/walking.ts
+/src/renderer/public/pixel/
+/src/renderer/public/character/害羞.png
+/src/renderer/public/character/生气.png
+/src/renderer/public/character/main.png
+/src/renderer/public/character/main1.png
+/src/renderer/public/character/pajamas/
+/src/renderer/public/character/superman/
+/src/renderer/public/character/default/random/
+/src/renderer/public/character/default/timed/
+/src/renderer/public/character/default/打字-1.png
+/src/renderer/public/character/default/摸鱼.png
+/src/renderer/public/character/default/手表.png
+/src/renderer/public/character/default/睡觉.png
+/src/renderer/public/character/default/bored.png
+/src/renderer/public/character/default/centered_牵狗.png
+/src/renderer/public/character/default/curious.png
+/src/renderer/public/character/default/drag.png
+/src/renderer/public/character/default/fall.png
+/src/renderer/public/character/default/happy.png
+/src/renderer/public/character/default/job.png
+/src/renderer/public/character/default/shy.webp
+
+# 依赖本机浏览器运行时的内部视觉检查
+/scripts/check-hero-windows.cjs
+/scripts/check-note-ui.cjs
+/scripts/check-note-url.cjs
+/scripts/check-release-ui.cjs

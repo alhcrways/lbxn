@@ -1,0 +1,364 @@
+.stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: hidden;
+  cursor: grab;
+}
+
+/* ============ 场景背景 ============ */
+/* 窗口默认只有人物大小（约 170×204），场景即人物周围的小光圈 */
+.sceneSuperman {
+  background: radial-gradient(circle at 50% 30%, rgba(66, 165, 245, 0.55), rgba(13, 71, 161, 0.75));
+  border-radius: var(--radius-l);
+}
+
+.sceneGuard {
+  background: linear-gradient(180deg, rgba(129, 199, 132, 0.5), rgba(46, 125, 50, 0.7));
+  border-radius: var(--radius-l);
+}
+
+.sceneLiving {
+  background: linear-gradient(180deg, rgba(255, 224, 178, 0.6), rgba(215, 204, 200, 0.8));
+  border-radius: var(--radius-l);
+}
+
+/* 动感超人基地：雷达扫描 */
+.radar {
+  position: absolute;
+  left: 50%;
+  top: 6px;
+  width: 120px;
+  height: 120px;
+  margin-left: -60px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  background: conic-gradient(from 0deg, rgba(255, 255, 255, 0.45), transparent 60deg, transparent);
+  animation: radarSweep 3s linear infinite;
+  opacity: 0.8;
+}
+
+.radarGrid {
+  position: absolute;
+  left: 50%;
+  top: 6px;
+  width: 120px;
+  height: 120px;
+  margin-left: -60px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  box-shadow:
+    inset 0 0 0 30px rgba(255, 255, 255, 0.06),
+    inset 0 0 0 58px rgba(255, 255, 255, 0.08);
+}
+
+@keyframes radarSweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 春日部防卫队：飘扬旗帜 */
+.flag {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  width: 44px;
+  height: 44px;
+}
+
+.flagPole {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 3px;
+  height: 42px;
+  border-radius: 2px;
+  background: #6d4c41;
+}
+
+.flagCloth {
+  position: absolute;
+  left: 3px;
+  top: 2px;
+  width: 36px;
+  height: 22px;
+  background: #e53935;
+  border-radius: 0 4px 4px 0;
+  transform-origin: left center;
+  animation: flagWave 1.6s ease-in-out infinite;
+}
+
+@keyframes flagWave {
+  0%,
+  100% {
+    transform: skewY(4deg) scaleX(1);
+  }
+  50% {
+    transform: skewY(-4deg) scaleX(0.92);
+  }
+}
+
+/* 野原家客厅：沙发 */
+.sofa {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 150px;
+  height: 54px;
+}
+
+.sofaBack {
+  position: absolute;
+  bottom: 16px;
+  left: 8px;
+  right: 8px;
+  height: 30px;
+  background: #8d6e63;
+  border-radius: var(--radius-m) var(--radius-m) 8px 8px;
+  box-shadow: inset 0 -6px 0 rgba(62, 39, 35, 0.15);
+}
+
+.sofaSeat {
+  position: absolute;
+  bottom: 4px;
+  left: 0;
+  right: 0;
+  height: 18px;
+  background: #a1887f;
+  border-radius: 8px 8px var(--radius-m) var(--radius-m);
+}
+
+.sofaArmL,
+.sofaArmR {
+  position: absolute;
+  bottom: 4px;
+  width: 18px;
+  height: 34px;
+  background: #8d6e63;
+  border-radius: var(--radius-m);
+}
+
+.sofaArmL {
+  left: -4px;
+}
+
+.sofaArmR {
+  right: -4px;
+}
+
+/* ============ 台词气泡 ============ */
+/* 气泡出现时窗口会临时向上扩展（底部中心锚定），气泡悬在头顶上方 */
+.bubble {
+  position: absolute;
+  bottom: 168px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 260px;
+  padding: var(--sp-2) var(--sp-3);
+  background-color: var(--paper);
+  background-image: var(--paper-grid);
+  background-size: 20px 20px;
+  border: 2px solid var(--ink);
+  border-radius: 15px 12px 17px 11px;
+  box-shadow: var(--shadow-sm);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-1);
+  text-align: center;
+  animation: popIn 0.25s ease-out;
+  z-index: 5;
+}
+
+.bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -9px;
+  left: 50%;
+  margin-left: -7px;
+  border: 7px solid transparent;
+  border-top-color: var(--ink);
+}
+
+.bubbleAngry {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: #fff8f8;
+}
+
+.bubbleAngry::after {
+  border-top-color: var(--danger);
+}
+
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+/* ============ 聊天图标 + 输入框 ============ */
+/* 收起态：靠近人物时才显示，底部锚定避免气泡扩窗时漂到头顶。 */
+.chatIcon {
+  position: absolute;
+  bottom: 24px;
+  left: calc(50% + 52px);
+  transform: translateY(3px);
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-full);
+  background: #fff7d8eb;
+  color: var(--ink);
+  border: 1px solid #947253;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(62, 39, 35, 0.08);
+  z-index: 7;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease, background 0.15s;
+}
+
+.stage:hover .chatIcon,
+.stage:focus-within .chatIcon {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+  transition-delay: 0.15s;
+}
+
+.chatIcon:hover {
+  background: var(--accent);
+  color: var(--ink);
+}
+
+.chatIcon:focus-visible {
+  outline: 2px solid #8d7665;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chatIcon {
+    transition: none;
+  }
+}
+
+@media (hover: none) {
+  .chatIcon {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+  }
+}
+
+/* ============ 桌宠与姿态动画 ============ */
+.petAnchor {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: max-content;
+  height: max-content;
+  pointer-events: none;
+}
+
+.petWrap {
+  position: relative;
+  touch-action: none;
+}
+
+.animBounce {
+  animation: bounce 0.5s ease-out 2;
+}
+
+@keyframes bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-16px);
+  }
+}
+
+.animDance {
+  animation: danceMove 0.8s ease-out 2;
+}
+
+@keyframes danceMove {
+  0%,
+  100% {
+    transform: rotate(0) translateY(0);
+  }
+  25% {
+    transform: rotate(-10deg) translateY(-8px);
+  }
+  75% {
+    transform: rotate(10deg) translateY(-8px);
+  }
+}
+
+.animFall {
+  animation: fallDown 1.2s ease-out;
+}
+
+@keyframes fallDown {
+  0% {
+    transform: translateY(0) rotate(0);
+  }
+  30% {
+    transform: translateY(-20px) rotate(-30deg);
+  }
+  60% {
+    transform: translateY(10px) rotate(-45deg);
+  }
+  80% {
+    transform: translateY(4px) rotate(-40deg);
+  }
+  100% {
+    transform: translateY(0) rotate(-36deg);
+  }
+}
+
+.animShake {
+  animation: shake 0.35s ease-out 3;
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-8px);
+  }
+  75% {
+    transform: translateX(8px);
+  }
+}
+
+.animChew {
+  animation: chew 0.45s ease-out 3;
+}
+
+@keyframes chew {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06) translateY(2px);
+  }
+}

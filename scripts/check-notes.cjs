@@ -1,0 +1,52 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { transformSync } = require('esbuild');
+const dir = fs.mkdtempSync(path.resolve('output/note-tests-'));
+let fail = false;
+const fakeFs = { ...fs, writeFileSync(...args) {
+  if (fail && String(args[0]).endsWith('notes.json.tmp')) throw new Error('test disk full');
+  return fs.writeFileSync(...args);
+} };
+function loadStore() {
+  const mod = { exports: {} };
+  const code = transformSync(fs.readFileSync('src/main/store.ts', 'utf8'), { loader: 'ts', format: 'cjs' }).code;
+  new Function('require', 'module', 'exports', code)((id) => {
+    if (id === 'electron') return { app: { getPath: () => dir } };
+    if (id === 'node:fs') return fakeFs;
+    return require(id);
+  }, mod, mod.exports);
+  mod.exports.initStores();
+  return mod.exports;
+}
+let store = loadStore();
+const one = store.appendNote({ content: '任务一\n最后几个字', color: 'yellow', pinned: false });
+const two = store.appendNote({ content: '第二张', color: 'green', pinned: false });
+assert.ok(one.ok && two.ok);
+assert.notEqual(one.result.id, two.result.id);
+const bounds = { x: -800, y: 80, width: 320, height: 350 };
+assert.ok(store.updateNote(one.result.id, { pinned: true, bounds, color: 'pink' }).ok);
+store = loadStore();
+assert.equal(store.getData('notes').length, 2);
+assert.deepEqual(store.getData('notes')[0].bounds, bounds);
+assert.equal(store.getData('notes')[0].pinned, true);
+assert.ok(store.updateNote(one.result.id, { pinned: false }).ok);
+assert.equal(store.getData('notes')[0].content, '任务一\n最后几个字');
+fail = true;
+assert.equal(store.updateNote(one.result.id, { content: 'must not overwrite', pinned: true }).ok, false);
+assert.equal(store.getData('notes')[0].content, '任务一\n最后几个字');
+assert.equal(store.getData('notes')[0].pinned, false);
+assert.equal(store.deleteNote(one.result.id).ok, false);
+assert.equal(store.getData('notes').length, 2);
+assert.equal(store.appendNote({ content: 'failed', color: 'yellow', pinned: false }).ok, false);
+assert.equal(store.getData('notes').length, 2);
+fail = false;
+for (let i = 2; i < 50; i++) assert.ok(store.appendNote({ content: String(i), color: 'yellow', pinned: false }).ok);
+assert.equal(store.appendNote({ content: '51st', color: 'yellow', pinned: false }).ok, false);
+assert.equal(store.getData('notes').length, 50);
+assert.equal(store.getData('notes')[0].id, one.result.id);
+assert.ok(store.deleteNote(two.result.id).ok);
+store = loadStore();
+assert.equal(store.getData('notes').length, 49);
+assert.equal(store.getData('notes').some((n) => n.id === two.result.id), false);
+console.log('Notes checks passed: multiple notes, persistence, pin/unpin, bounds, deletion, capacity, save failure rollback.');

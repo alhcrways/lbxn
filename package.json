@@ -1,0 +1,64 @@
+{
+  "name": "shinchan-pet",
+  "version": "1.0.0",
+  "description": "蜡笔小新桌宠：支持聊天与多便利贴的 Windows 桌面宠物",
+  "main": "dist-electron/main.cjs",
+  "author": "shinchan-pet",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "icon": "node scripts/make-icon.mjs",
+    "dev:renderer": "vite",
+    "dev:main": "wait-on http://[::1]:5173/ && npm run build:main && cross-env ELECTRON_START_URL=http://127.0.0.1:5173 node scripts/launch.mjs",
+    "dev": "concurrently -k \"npm:dev:renderer\" \"npm:dev:main\"",
+    "build:main": "node esbuild.config.mjs",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run build:main && vite build",
+    "start": "npm run build:main && vite build && node scripts/launch.mjs",
+    "dist": "npm run build && electron-builder --win nsis portable"
+  },
+  "dependencies": {
+    "@tabler/icons-react": "^3.24.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@types/node": "^22.10.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
+    "electron": "^33.2.0",
+    "esbuild": "^0.24.2",
+    "typescript": "^5.7.2",
+    "vite": "^5.4.11",
+    "wait-on": "^8.0.1"
+  },
+  "comments": {
+    "packaging": "打包安装包时先执行: npm i -D electron-builder，再运行 npm run dist（electron-builder 体积较大，日常开发无需安装）"
+  },
+  "build": {
+    "appId": "com.shinchan.pet",
+    "productName": "蜡笔小新桌宠",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "dist-electron/**",
+      "assets/**"
+    ],
+    "win": {
+      "icon": "assets/icon.png",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

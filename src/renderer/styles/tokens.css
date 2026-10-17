@@ -1,0 +1,71 @@
+/* ==== 复古童趣风 · 设计令牌（来自 PRD §6） ==== */
+:root {
+  /* 颜色 */
+  --primary: #cf4035;
+  --accent: #f8d56b;
+  --bg-base: #fff7d8;
+  --bg-layer: #fffdf3;
+  --divider: #d9c8a5;
+  --text-1: #594332;
+  --text-2: #765a45;
+  --text-disabled: #ab927a;
+  --danger: #b84632;
+  --ok: #557a43;
+
+  --paper: #fff7d8;
+  --ink: #594332;
+  --chocobi: #b7d399;
+  --hero-blue: #287cac;
+  --paper-grid: linear-gradient(#a28b6b12 1px, transparent 1px), linear-gradient(90deg, #a28b6b12 1px, transparent 1px);
+
+  /* 圆角 */
+  --radius-s: 8px;
+  --radius-m: 16px;
+  --radius-l: 24px;
+  --radius-full: 999px;
+
+  /* 阴影 */
+  --shadow-sm: 0 3px 0 #59433220, 0 4px 10px #59433212;
+
+  /* 字体（1.25 比例） */
+  --font: 'Kalam', 'ZCOOL KuaiLe', 'Comic Sans MS', 'Microsoft YaHei', cursive;
+  --h1: 700 28px/1.2 var(--font);
+  --h2: 600 22px/1.3 var(--font);
+  --body: 400 14px/1.5 var(--font);
+  --caption: 400 12px/1.4 var(--font);
+
+  /* 间距（4px 基准） */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --gap: 12px;
+  --pad: 16px;
+}
+
+html,
+body,
+#root {
+  min-height: 100vh;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  overflow: hidden;
+  font: var(--body);
+  color: var(--text-1);
+  user-select: none;
+  cursor: default;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+}

@@ -1,0 +1,44 @@
+.svg,
+.img {
+  display: block;
+  pointer-events: none;
+  filter: drop-shadow(0 3px 5px rgba(62, 39, 35, 0.25));
+}
+
+.img {
+  object-fit: contain;
+}
+
+/* 帧序列播放：所有帧叠加在同一位置，仅当前帧可见，实现无闪烁循环动画 */
+.frameWrap {
+  position: relative;
+}
+.frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  opacity: 0;
+  object-fit: contain;
+  display: block;
+  pointer-events: none;
+  filter: drop-shadow(0 3px 5px rgba(62, 39, 35, 0.25));
+}
+.frameActive {
+  opacity: 1;
+}
+
+/* 呼吸感：待机时轻微起伏 */
+.breathe {
+  animation: breathe 2.6s ease-in-out infinite;
+  transform-origin: 60px 130px;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: translateY(0) scaleY(1);
+  }
+  50% {
+    transform: translateY(-2px) scaleY(1.02);
+  }
+}

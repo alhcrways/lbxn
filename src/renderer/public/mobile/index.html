@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#22c55e">
+<title>小新 · 手机连接</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(180deg, #ecfdf5 0%, #f7faf7 100%);
+    display: flex; flex-direction: column; color: #1f2937;
+  }
+  .stage {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 16px; gap: 12px; overflow: hidden;
+  }
+  .pet { width: 170px; height: 204px; display: flex; align-items: flex-end; justify-content: center; }
+  .pet img { width: 170px; height: 204px; object-fit: contain; animation: float 2.6s ease-in-out infinite; }
+  .pet img.playing { animation: none; }
+  @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+  .status { font-size: 13px; color: #16a34a; text-align: center; }
+  .status.off { color: #d32f2f; }
+  .bubble {
+    max-width: 320px; min-height: 44px; background: #fff; border: 1px solid #e2e8e2; border-radius: 14px;
+    border-top-left-radius: 4px; padding: 10px 14px; font-size: 15px; line-height: 1.6;
+    word-break: break-word; white-space: pre-wrap; box-shadow: 0 1px 3px rgba(0,0,0,.05);
+  }
+  .bubble:empty { display: none; }
+  .hint { font-size: 12px; color: #9ca3af; text-align: center; }
+  .inputbar {
+    flex: none; display: flex; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    background: #fff; border-top: 1px solid #e5e7eb;
+  }
+  .inputbar input {
+    flex: 1; border: 1px solid #d1d5db; border-radius: 10px; padding: 10px 12px; font-size: 15px; outline: none;
+  }
+  .inputbar input:focus { border-color: #22c55e; }
+  .inputbar button {
+    flex: none; width: 56px; border: none; border-radius: 10px; background: #22c55e; color: #fff; font-size: 15px;
+  }
+  .inputbar button:active { background: #16a34a; }
+  .inputbar button:disabled { background: #b6dcb6; }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="pet"><img id="pet" alt="小新"></div>
+    <div class="status" id="status">连接中…</div>
+    <div class="bubble" id="bubble"></div>
+    <div class="hint" id="hint"></div>
+  </div>
+  <div class="inputbar">
+    <input id="input" type="text" placeholder="给电脑端的小新捎句话…" autocomplete="off">
+    <button id="send" disabled>发送</button>
+  </div>
+<script>
+  const params = new URLSearchParams(location.search);
+  const token = params.get('t') || '';
+  const imgEl = document.getElementById('pet');
+  const bubbleEl = document.getElementById('bubble');
+  const hintEl = document.getElementById('hint');
+  const inputEl = document.getElementById('input');
+  const sendEl = document.getElementById('send');
+  const statusEl = document.getElementById('status');
+  let streaming = null;
+  let gotState = false;
+  let assets = { poses: {}, random: [], timed: [] };
+
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function setBubble(text) {
+    bubbleEl.innerHTML = text ? esc(text) : '';
+  }
+  function setStatus(text, off) {
+    statusEl.textContent = text;
+    statusEl.className = 'status' + (off ? ' off' : '');
+  }
+  function setHint(text) {
+    hintEl.textContent = text || '';
+  }
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  /** 形象图片等静态资源必须带访问令牌，否则主进程校验 403（裂图） */
+  function assetUrl(path) {
+    return '/' + path + '?t=' + encodeURIComponent(token);
+  }
+
+  // ---------- 桌宠形象动画系统（与电脑端同一套资产与播放规则） ----------
+  let animTimer = null;   // 当前帧动画定时器
+  let baseTimer = null;   // 随机动作轮换定时器
+  let happyTimer = null;  // 开心反应定时器
+  let reacting = false;   // 正在播放开心反应
+
+  function stopAnim() {
+    clearTimeout(animTimer);
+    animTimer = null;
+    imgEl.classList.remove('playing');
+  }
+  function stopHappy() {
+    clearTimeout(happyTimer);
+    happyTimer = null;
+    reacting = false;
+  }
+  /** 循环播放帧动画（单图资产按超长间隔循环，等效静止） */
+  function playLoop(a) {
+    stopAnim();
+    imgEl.classList.add('playing');
+    let i = 0;
+    const tick = () => {
+      imgEl.src = assetUrl(a.frames[i]);
+      i = (i + 1) % a.frames.length;
+      animTimer = setTimeout(tick, a.frameMs || 125);
+    };
+    tick();
+  }
+  /** 单轮播放帧动画后回调 */
+  function playOnce(a, then) {
+    stopAnim();
+    imgEl.classList.add('playing');
+    let i = 0;
+    const tick = () => {
+      if (i >= a.frames.length) {
+        imgEl.classList.remove('playing');
+        then();
+        return;
+      }
+      imgEl.src = assetUrl(a.frames[i]);
+      i++;
+      animTimer = setTimeout(tick, a.frameMs || 125);
+    };
+    tick();
+  }
+  function asAnim(p) {
+    return p.kind === 'anim' ? p : { frames: [p.src], frameMs: 999999 };
+  }
+  function poseAsset(name) { return assets.poses[name] || null; }
+
+  /** 基础状态：时段动画 > 随机动作 > idle 形象 */
+  function showBase() {
+    stopHappy();
+    const hour = new Date().getHours();
+    const timed = assets.timed.find((t) => t.hour === hour);
+    const p = timed || (assets.random.length ? pick(assets.random) : poseAsset('idle'));
+    if (p) playLoop(p.kind === 'anim' ? p : { frames: [p.src], frameMs: 999999 });
+  }
+  /** 每 45 秒换一个随机动作（无互动时保持鲜活，与电脑端节奏一致） */
+  function scheduleBase() {
+    clearTimeout(baseTimer);
+    baseTimer = setTimeout(() => {
+      if (!reacting) showBase();
+      scheduleBase();
+    }, 45000);
+  }
+  /** 收到回复时开心反应：happy 姿态播一轮（单图 2 秒）后回基础动画 */
+  function happyReact() {
+    const p = poseAsset('happy');
+    if (!p) return;
+    reacting = true;
+    clearTimeout(baseTimer);
+    if (p.kind === 'image') {
+      stopAnim();
+      imgEl.src = assetUrl(p.src);
+      happyTimer = setTimeout(() => {
+        reacting = false;
+        showBase();
+        scheduleBase();
+      }, 2000);
+    } else {
+      happyTimer = null;
+      playOnce(p, () => {
+        reacting = false;
+        showBase();
+        scheduleBase();
+      });
+    }
+  }
+
+  // 拉取当前形象资产（电脑端换装后由 costume 事件触发刷新）
+  async function loadAssets() {
+    try {
+      const r = await fetch('/assets?t=' + encodeURIComponent(token));
+      const j = await r.json();
+      assets = j.assets || { poses: {}, random: [], timed: [] };
+      if (!reacting) showBase();
+      scheduleBase();
+    } catch { /* 断线时保持当前动画 */ }
+  }
+
+  // SSE：连接即收当前状态（最近一次回复），之后收流式回复与换装同步
+  function connect() {
+    const es = new EventSource('/events?t=' + encodeURIComponent(token));
+    es.addEventListener('state', (e) => {
+      gotState = true;
+      const { lastReply } = JSON.parse(e.data);
+      if (streaming === null) setBubble(lastReply || '');
+      setStatus('小新正在电脑桌面上陪着你', false);
+      setHint('发送的消息会通知电脑端，由你在电脑边让小新回应哦');
+      sendEl.disabled = false;
+    });
+    es.addEventListener('chunk', (e) => {
+      const { delta } = JSON.parse(e.data);
+      if (streaming === null) happyReact();
+      streaming = (streaming || '') + delta;
+      setBubble(streaming);
+      setStatus('小新在电脑边回应你啦', false);
+    });
+    es.addEventListener('done', (e) => {
+      const { text } = JSON.parse(e.data);
+      streaming = null;
+      setBubble(text);
+      setHint('');
+    });
+    es.addEventListener('costume', () => {
+      void loadAssets();
+    });
+    es.addEventListener('error', (e) => {
+      const data = e.data ? JSON.parse(e.data) : null;
+      if (data && data.message) {
+        streaming = null;
+        setBubble('哎呀，' + data.message);
+        setHint('');
+      }
+    });
+    es.onerror = () => {
+      if (!gotState) {
+        setStatus('连接失败：请确认电脑端已开启手机连接，且地址最新', true);
+        sendEl.disabled = true;
+      } else {
+        setStatus('已断开，自动重连中…', true);
+      }
+    };
+  }
+
+  async function send() {
+    const text = inputEl.value.trim();
+    if (!text) return;
+    inputEl.value = '';
+    try {
+      const r = await fetch('/send?t=' + encodeURIComponent(token), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text }),
+      });
+      const j = await r.json();
+      if (j.ok) {
+        setStatus('已送达电脑端的小新～等你在电脑边回应', false);
+        setHint('回到电脑边点点小新，就能看到并回复这条消息');
+      } else {
+        setStatus('发送失败，请重试', true);
+      }
+    } catch {
+      setStatus('网络开小差了，再试一次？', true);
+    }
+  }
+
+  sendEl.addEventListener('click', send);
+  inputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') send();
+  });
+  // 首屏：先显示默认形象（带令牌），再异步加载当前搭配资产
+  imgEl.src = assetUrl('character/default/idle.png');
+  loadAssets();
+  connect();
+</script>
+</body>
+</html>
