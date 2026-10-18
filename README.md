@@ -74,7 +74,7 @@
 
 普通用户只需要下载一个 `.exe` 文件，**不需要安装 Node.js，也不需要安装其他运行环境**。
 
-1. 点击 [直接下载 Windows 便携版](https://github.com/alhcrways/lbxn/releases/latest/download/Shinchan-Pet-1.0.1-Portable.exe)。
+1. 点击 [直接下载 Windows 便携版](https://github.com/alhcrways/lbxn/releases/latest/download/Shinchan-Pet-1.0.2-Portable.exe)。
 2. 双击下载好的 `.exe`，小新就会出现在桌面上。
 
 需要查找旧版本时，可以前往 [历史版本页面](https://github.com/alhcrways/lbxn/releases)。
@@ -152,7 +152,7 @@ npm run dist:portable
 npm run dist
 ```
 
-生成文件位于 `release/` 目录。将 `Shinchan-Pet-1.0.1-Portable.exe` 上传到 GitHub Releases 后，普通用户即可下载并直接运行。
+生成文件位于 `release/` 目录。将 `Shinchan-Pet-1.0.2-Portable.exe` 上传到 GitHub Releases 后，普通用户即可下载并直接运行。
 
 仓库包含 GitHub Actions 发布流程。维护者推送 `v1.0.0` 这类版本标签后，GitHub 会自动构建便携版 `.exe` 并创建 Release。项目自行上传的 Release 附件只保留一个可运行文件。
 

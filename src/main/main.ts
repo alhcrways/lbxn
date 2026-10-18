@@ -13,7 +13,7 @@ import { resolveProviderSelection } from './modelPresets';
 import { settingsHtml } from './settingsView';
 import { noteFolderHtml } from './noteFolderView';
 import { controlMenuHtml } from './menuView';
-import { chatWindowHtml } from './chatView';
+import { chatWindowHtml, chatWindowScript } from './chatView';
 import { RELEASE_FEATURES } from '../shared/releaseFeatures';
 import { SHINCHAN_PERSONA } from '../shared/persona';
 import type { StoreKey, TrayCommand, WinBounds, LlmConfig, ChatMessage, StickyNote, NoteColor, CostumeAssets, ServerAuth, OutfitData, PetState } from '../shared/types';
@@ -394,16 +394,21 @@ function openChatWindow() {
   chatWin.setAlwaysOnTop(true, 'screen-saver');
   positionChatWindow();
   const current = chatWin;
-  current.once('ready-to-show', () => {
-    if (current.isDestroyed()) return;
-    current.show();
-    current.focus();
-  });
   current.on('closed', () => {
     if (chatWin === current) chatWin = null;
     win?.webContents.send('chat-window-state', false);
   });
-  void current.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(chatWindowHtml()));
+  void current.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(chatWindowHtml())).then(async () => {
+    if (current.isDestroyed()) return;
+    try {
+      await current.webContents.executeJavaScript(chatWindowScript());
+    } catch (error) {
+      console.error('[chat-window] failed to initialize', error);
+    }
+    if (current.isDestroyed()) return;
+    current.show();
+    current.focus();
+  });
   return true;
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "shinchan-pet",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "蜡笔小新桌宠：支持聊天与多便利贴的 Windows 桌面宠物",
   "main": "dist-electron/main.cjs",
   "author": "shinchan-pet",
@@ -17,12 +17,8 @@
     "dist": "npm run build && electron-builder --win nsis portable",
     "dist:portable": "npm run build && electron-builder --win portable"
   },
-  "dependencies": {
-    "@tabler/icons-react": "^3.24.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
-  },
   "devDependencies": {
+    "@tabler/icons-react": "^3.24.0",
     "@types/node": "^22.10.2",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
@@ -32,6 +28,8 @@
     "electron": "^33.2.0",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.24.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "typescript": "^5.7.2",
     "vite": "^5.4.11",
     "wait-on": "^8.0.1"
