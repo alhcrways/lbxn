@@ -155,7 +155,7 @@ npm run dist
 
 生成文件位于 `release/` 目录。将 `Shinchan-Pet-1.0.0-Portable.exe` 上传到 GitHub Releases 后，普通用户即可下载并直接运行。
 
-仓库包含 GitHub Actions 发布流程。维护者推送 `v1.0.0` 这类版本标签后，GitHub 会自动构建便携版 `.exe`、生成 SHA-256 校验文件并创建 Release。
+仓库包含 GitHub Actions 发布流程。维护者推送 `v1.0.0` 这类版本标签后，GitHub 会自动构建便携版 `.exe` 并创建 Release。项目自行上传的 Release 附件只保留一个可运行文件。
 
 ## 本地数据
 
