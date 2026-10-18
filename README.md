@@ -74,10 +74,10 @@
 
 普通用户只需要下载一个 `.exe` 文件，**不需要安装 Node.js，也不需要安装其他运行环境**。
 
-1. 点击 [直接下载 Windows 便携版](https://github.com/huchengran0725-ctrl/lbxn/releases/latest/download/Shinchan-Pet-1.0.0-Portable.exe)。
+1. 点击 [直接下载 Windows 便携版](https://github.com/alhcrways/lbxn/releases/latest/download/Shinchan-Pet-1.0.0-Portable.exe)。
 2. 双击下载好的 `.exe`，小新就会出现在桌面上。
 
-需要查找旧版本时，可以前往 [历史版本页面](https://github.com/huchengran0725-ctrl/lbxn/releases)。
+需要查找旧版本时，可以前往 [历史版本页面](https://github.com/alhcrways/lbxn/releases)。
 
 ### 基本操作
 
@@ -121,7 +121,7 @@
 源码开发需要 Node.js 18 或更高版本。
 
 ```bash
-git clone https://github.com/huchengran0725-ctrl/lbxn.git
+git clone https://github.com/alhcrways/lbxn.git
 cd lbxn
 npm install
 npm run dev
