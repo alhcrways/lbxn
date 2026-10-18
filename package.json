@@ -7,7 +7,6 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "icon": "node scripts/make-icon.mjs",
     "dev:renderer": "vite",
     "dev:main": "wait-on http://[::1]:5173/ && npm run build:main && cross-env ELECTRON_START_URL=http://127.0.0.1:5173 node scripts/launch.mjs",
     "dev": "concurrently -k \"npm:dev:renderer\" \"npm:dev:main\"",
