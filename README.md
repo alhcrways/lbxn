@@ -74,11 +74,10 @@
 
 普通用户只需要下载一个 `.exe` 文件，**不需要安装 Node.js，也不需要安装其他运行环境**。
 
-1. 前往 [Releases 下载页面](https://github.com/huchengran0725-ctrl/lbxn/releases/latest)。
-2. 下载 `Shinchan-Pet-1.0.0-Portable.exe`。
-3. 双击 `.exe`，小新就会出现在桌面上。
+1. 点击 [直接下载 Windows 便携版](https://github.com/huchengran0725-ctrl/lbxn/releases/latest/download/Shinchan-Pet-1.0.0-Portable.exe)。
+2. 双击下载好的 `.exe`，小新就会出现在桌面上。
 
-> 提示：请下载 Releases 页面中的便携版 `.exe`，不要下载 GitHub 自动生成的 `Source code` 压缩包。源码压缩包是给开发者使用的，不能直接启动桌宠。
+需要查找旧版本时，可以前往 [历史版本页面](https://github.com/huchengran0725-ctrl/lbxn/releases)。
 
 ### 基本操作
 
