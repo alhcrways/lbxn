@@ -34,6 +34,9 @@ const keepReleaseCharacterAssets = {
 export default defineConfig({
   root: resolve(__dirname, 'src/renderer'),
   base: './',
+  // Avoid intermittent Windows realpath EPERM failures while resolving files
+  // from this workspace. There are no linked renderer dependencies here.
+  resolve: { preserveSymlinks: true },
   plugins: [react(), keepReleaseCharacterAssets],
   build: {
     outDir: resolve(__dirname, 'dist'),

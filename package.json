@@ -1,6 +1,6 @@
 {
   "name": "shinchan-pet",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "蜡笔小新桌宠：支持聊天与多便利贴的 Windows 桌面宠物",
   "main": "dist-electron/main.cjs",
   "author": "shinchan-pet",
@@ -40,6 +40,7 @@
   "build": {
     "appId": "com.shinchan.pet",
     "productName": "蜡笔小新桌宠",
+    "npmRebuild": false,
     "directories": {
       "output": "release"
     },

@@ -12,7 +12,7 @@ import { NOTE_COLORS, type NoteStickers } from './noteView';
 import { resolveProviderSelection } from './modelPresets';
 import { settingsHtml } from './settingsView';
 import { noteFolderHtml } from './noteFolderView';
-import { controlMenuHtml } from './menuView';
+import { controlMenuHtml, controlMenuScript } from './menuView';
 import { chatWindowHtml, chatWindowScript } from './chatView';
 import { RELEASE_FEATURES } from '../shared/releaseFeatures';
 import { SHINCHAN_PERSONA } from '../shared/persona';
@@ -32,6 +32,23 @@ let chatWin: BrowserWindow | null = null;
 let noteFolderWin: BrowserWindow | null = null;
 /** 便利贴窗口池（noteId → BrowserWindow），未固定与已固定共用 */
 const noteWins = new Map<string, BrowserWindow>();
+
+/** Preserve the complete UTF-8 document; long percent-encoded data URLs can fail on Windows. */
+function htmlDataUrl(html: string) {
+  return `data:text/html;charset=utf-8;base64,${Buffer.from(html, 'utf8').toString('base64')}`;
+}
+
+/**
+ * Keep companion windows above normal apps without promoting them to the
+ * screen-saver/system-overlay layer.  Some Windows capture pipelines omit
+ * that highest layer.  Explicitly disable content protection as well so a
+ * future Electron/default change cannot accidentally hide the pet from a
+ * screen recording.
+ */
+function setCaptureFriendlyAlwaysOnTop(window: BrowserWindow, flag: boolean) {
+  window.setContentProtection(false);
+  window.setAlwaysOnTop(flag, 'floating');
+}
 
 // 无 GPU / 受限沙箱（远程桌面、容器等）环境的逃生开关：
 // 设置环境变量 SHINCHAN_NO_GPU=1 启动
@@ -77,7 +94,7 @@ function createWindow() {
     },
   });
 
-  win.setAlwaysOnTop(true, 'screen-saver');
+  setCaptureFriendlyAlwaysOnTop(win, true);
 
   if (isDev) {
     win.loadURL(process.env.ELECTRON_START_URL!);
@@ -229,7 +246,7 @@ function sendTrayCommand(cmd: TrayCommand) {
     passthrough = !passthrough;
     win?.setIgnoreMouseEvents(passthrough, { forward: true });
   } else if (cmd === 'toggle-top') {
-    if (win) win.setAlwaysOnTop(!win.isAlwaysOnTop(), 'screen-saver');
+    if (win) setCaptureFriendlyAlwaysOnTop(win, !win.isAlwaysOnTop());
   } else if (cmd === 'show-hide') {
     if (win?.isVisible()) win.hide();
     else win?.show();
@@ -286,11 +303,22 @@ function openMenuWindow() {
       nodeIntegration: true,
     },
   });
-  menuWin.setAlwaysOnTop(true, 'screen-saver');
+  setCaptureFriendlyAlwaysOnTop(menuWin, true);
 
   const currentMenu = menuWin;
-  currentMenu.once('ready-to-show', () => { if (!currentMenu.isDestroyed()) currentMenu.show(); });
-  void currentMenu.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+  void currentMenu.loadURL(htmlDataUrl(html)).then(async () => {
+    if (currentMenu.isDestroyed()) return;
+    try {
+      await currentMenu.webContents.executeJavaScript(controlMenuScript());
+    } catch (error) {
+      console.error('[control-menu] failed to initialize', error);
+      return;
+    }
+    if (!currentMenu.isDestroyed()) {
+      currentMenu.show();
+      currentMenu.focus();
+    }
+  });
 
   // 失焦 / 关闭时清理
   menuWin.on('blur', () => menuWin?.close());
@@ -340,10 +368,10 @@ function openLlmConfigWindow() {
       nodeIntegration: true,
     },
   });
-  configWin.setAlwaysOnTop(true, 'screen-saver');
+  setCaptureFriendlyAlwaysOnTop(configWin, true);
   const currentConfig = configWin;
   currentConfig.once('ready-to-show', () => { if (!currentConfig.isDestroyed()) currentConfig.show(); });
-  void configWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html)).then(() => {
+  void configWin.loadURL(htmlDataUrl(html)).then(() => {
     configWin?.focus();
   });
   configWin.on('blur', () => configWin?.close());
@@ -352,7 +380,8 @@ function openLlmConfigWindow() {
   });
 }
 
-const CHAT_WINDOW_SIZE = { width: 250, height: 220 };
+// 留出足够的固定空间，避免 Windows 字体放大或不同 DPI 下输入区被裁切。
+const CHAT_WINDOW_SIZE = { width: 276, height: 252 };
 
 /** 将聊天小窗贴在小新侧边，并在屏幕边缘自动翻到另一侧。 */
 function positionChatWindow() {
@@ -391,14 +420,14 @@ function openChatWindow() {
     show: false,
     webPreferences: { contextIsolation: false, nodeIntegration: true },
   });
-  chatWin.setAlwaysOnTop(true, 'screen-saver');
+  setCaptureFriendlyAlwaysOnTop(chatWin, true);
   positionChatWindow();
   const current = chatWin;
   current.on('closed', () => {
     if (chatWin === current) chatWin = null;
     win?.webContents.send('chat-window-state', false);
   });
-  void current.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(chatWindowHtml())).then(async () => {
+  void current.loadURL(htmlDataUrl(chatWindowHtml())).then(async () => {
     if (current.isDestroyed()) return;
     try {
       await current.webContents.executeJavaScript(chatWindowScript());
@@ -466,7 +495,7 @@ function createNoteWindow(note: StickyNote, focus = true) {
     alwaysOnTop: note.pinned, skipTaskbar: true, resizable: true, focusable: true, show: false,
     webPreferences: { contextIsolation: false, nodeIntegration: true },
   });
-  nw.setAlwaysOnTop(note.pinned, 'screen-saver');
+  setCaptureFriendlyAlwaysOnTop(nw, note.pinned);
   let boundsTimer: ReturnType<typeof setTimeout> | undefined;
   const saveBounds = () => {
     clearTimeout(boundsTimer);
@@ -540,10 +569,10 @@ function openNoteEditor(parent?: BrowserWindow) {
     webPreferences: { contextIsolation: false, nodeIntegration: true },
   });
   noteFolderWin = folder;
-  folder.setAlwaysOnTop(true, 'screen-saver');
+  setCaptureFriendlyAlwaysOnTop(folder, true);
   folder.once('ready-to-show', () => { if (!folder.isDestroyed()) folder.show(); });
   folder.on('closed', () => { if (noteFolderWin === folder) noteFolderWin = null; });
-  void folder.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(noteFolderHtml()));
+  void folder.loadURL(htmlDataUrl(noteFolderHtml()));
 }
 function restorePinnedNotes() {
   for (const note of getData('notes') as StickyNote[]) if (note.pinned) createNoteWindow(note, false);
@@ -1019,7 +1048,7 @@ function registerIpc() {
     win.setBounds({ x, y, width: w, height: h });
     // 右键菜单是独立 BrowserWindow 且 focusable，关闭后焦点会跑到桌面/其他应用，
     // 主窗口虽 alwaysOnTop 但未激活会被遮挡——这里显式 show + focus + moveTop 强制置顶
-    win.setAlwaysOnTop(true, 'screen-saver');
+    setCaptureFriendlyAlwaysOnTop(win, true);
     win.show();
     win.focus();
     win.moveTop();
@@ -1090,7 +1119,7 @@ function registerIpc() {
     if (!ownNote(event.sender, id) || typeof pinned !== 'boolean') return { ok: false };
     const nw = noteWins.get(id)!;
     const result = updateNote(id, { pinned, bounds: nw.getBounds() });
-    if (result.ok) nw.setAlwaysOnTop(pinned, 'screen-saver');
+    if (result.ok) setCaptureFriendlyAlwaysOnTop(nw, pinned);
     return result;
   });
   ipcMain.on('note:new', (event, id: string) => { if (ownNote(event.sender, id)) newNoteWindow(); });
