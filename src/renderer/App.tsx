@@ -1,6 +1,6 @@
 // 应用总控：数据加载/持久化、情绪感知引擎、手势分发、零食奖励、页面切换
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Emotion, GrowthData, LogEntry, OutfitData, PetState, TrayCommand, CostumeId, CostumeAssets, PoseAsset } from '../shared/types';
+import type { Emotion, GrowthData, LogEntry, OutfitData, PetState, TrayCommand, CostumeId, CostumeAssets, PoseAsset, WalkingState } from '../shared/types';
 import PetStage, { type Bubble, type Gesture } from './components/PetStage';
 import GrowthOverlay from './components/GrowthOverlay';
 import ToastHub, { type ToastItem } from './components/Toast';
@@ -67,6 +67,13 @@ export default function App() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [celebrationLevel, setCelebrationLevel] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [walking, setWalking] = useState<WalkingState>({ enabled: true, walking: false, direction: 'left', reminderActive: false, intervalMinutes: 60, nextReminderAt: null });
+  useEffect(() => {
+    let received = false;
+    const off = window.petAPI.onWalkingState(state => { received = true; setWalking(state); });
+    void window.petAPI.getWalkingState().then(state => { if (!received && state) setWalking(state); });
+    return off;
+  }, []);
   // 聊天状态
   const [chatOpen, setChatOpen] = useState(false);
   const [chatLoading, setChatLoading] = useState(false);
@@ -158,6 +165,8 @@ export default function App() {
       // 首次启动欢迎台词（PRD 边界情况：空数据）
       if (s.totalInteractions === 0) {
         setBubble({ text: '咦？你来啦~', kind: 'speech' });
+        if (bubbleTimer.current) window.clearTimeout(bubbleTimer.current);
+        bubbleTimer.current = window.setTimeout(() => setBubble(null), 3000);
       }
     } catch {
       setLoadError(true);
@@ -395,14 +404,14 @@ export default function App() {
       // 刚从浮层返回：精确还原桌宠位置
       void window.petAPI.closeOverlay();
     } else {
-      const expanded = !!bubble || toasts.length > 0;
+      const expanded = !!bubble || toasts.length > 0 || walking.reminderActive;
       void window.petAPI.setWindowSize(
         expanded ? EXPANDED_SIZE.width : PET_SIZE.width,
         expanded ? EXPANDED_SIZE.height : PET_SIZE.height,
       );
     }
     prevModeRef.current = mode;
-  }, [mode, bubble, toasts.length, dragging]);
+  }, [mode, bubble, toasts.length, dragging, walking.reminderActive]);
 
   // ---------- 手势处理 ----------
   const handleGesture = useCallback(
@@ -412,6 +421,13 @@ export default function App() {
       if (g === 'click' && mobileUnreadRef.current.length > 0) {
         changeChatOpen(true);
         setTransientPose('happy');
+        return;
+      }
+      if (g === 'dblclick' && walking.reminderActive) {
+        setWalking(previous => ({ ...previous, walking: false, reminderActive: false }));
+        if (poseTimer.current) window.clearTimeout(poseTimer.current);
+        setPose('idle');
+        void window.petAPI.dismissWalkingReminder().then(state => { if (state) setWalking(state); });
         return;
       }
       if (g === 'dblclick') {
@@ -433,7 +449,7 @@ export default function App() {
       }
       // 单击 / 拖拽（含甩飞）→ 不触发任何反应，保持默认 idle
     },
-    [growth, petState, mode, touchState, setTransientPose, changeChatOpen, costumeAssets],
+    [growth, petState, mode, touchState, setTransientPose, changeChatOpen, costumeAssets, walking.reminderActive],
   );
 
   // ---------- 情绪感知引擎 ----------
@@ -528,12 +544,21 @@ export default function App() {
     [toast],
   );
 
+  const canWalk = ready && mode === 'pet' && pose === 'idle' && !dragging && !chatOpen && !chatLoading && !bubble
+    && !!costumeAssets?.poses['walk-left'] && !!costumeAssets?.poses['walk-right'];
+  useEffect(() => {
+    window.petAPI.setWalkingReady(canWalk);
+    return () => window.petAPI.setWalkingReady(false);
+  }, [canWalk]);
+
   if (!ready) {
     return <div className={styles.boot}>…</div>;
   }
 
   // 眨眼是固定待机；未提供眨眼素材的服装继续使用自己的站姿。
-  const displayPose: Pose = chatLoading && costumeAssets?.poses.thinking ? 'thinking' : pose;
+  const displayPose: Pose = walking.reminderActive && costumeAssets?.poses[`walk-${walking.direction}`]
+    ? `walk-${walking.direction}`
+    : chatLoading && costumeAssets?.poses.thinking ? 'thinking' : pose;
   const poseAsset: PoseAsset | undefined = displayPose === 'idle'
     ? costumeAssets?.poses.blink ?? costumeAssets?.poses.idle
     : displayPose === 'shy' && costume === 'default'
@@ -547,6 +572,7 @@ export default function App() {
           pose={displayPose}
           poseRun={poseRun}
           bubble={bubble}
+          breakReminderActive={walking.reminderActive}
           emotion={emotion}
           scene={outfit.scene}
           costume={outfit.costume}

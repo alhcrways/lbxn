@@ -2,7 +2,7 @@
 // 职责：透明置顶无边框窗口、托盘菜单、窗口移动/穿透控制、本地数据 IPC
 import { app, BrowserWindow, Tray, Menu, screen, ipcMain, nativeImage, dialog, Notification } from 'electron';
 import { join, relative, resolve, sep } from 'node:path';
-import { readdirSync, statSync, readFileSync } from 'node:fs';
+import { readdirSync, statSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import * as http from 'node:http';
 import * as os from 'node:os';
@@ -16,11 +16,24 @@ import { controlMenuHtml, controlMenuScript } from './menuView';
 import { chatWindowHtml, chatWindowScript } from './chatView';
 import { RELEASE_FEATURES } from '../shared/releaseFeatures';
 import { SHINCHAN_PERSONA } from '../shared/persona';
+import { BreakReminder } from './breakReminder';
+import { PetWalker } from './petWalking';
+import { setupSocial } from './socialWindow';
 import type { StoreKey, TrayCommand, WinBounds, LlmConfig, ChatMessage, StickyNote, NoteColor, CostumeAssets, ServerAuth, OutfitData, PetState } from '../shared/types';
 
 let win: BrowserWindow | null = null;
 let tray: Tray | null = null;
+let social: ReturnType<typeof setupSocial> | null = null;
 let passthrough = false;
+let transparentPassthrough = false;
+let appliedIgnoreMouse: boolean | null = null;
+function applyMousePassthrough() {
+  if (!win) return;
+  const ignore = passthrough || (!savedPetBounds && !dragState && transparentPassthrough);
+  if (ignore === appliedIgnoreMouse) return;
+  win.setIgnoreMouseEvents(ignore, { forward: true });
+  appliedIgnoreMouse = ignore;
+}
 /** 打开浮层前桌宠窗口的位置，关闭浮层时据此精确还原 */
 let savedPetBounds: WinBounds | null = null;
 /** 右键菜单的独立悬浮窗（不碰主窗口尺寸，小新绝不位移） */
@@ -61,14 +74,92 @@ if (process.env.SHINCHAN_NO_GPU === '1') {
 
 const isDev = !!process.env.ELECTRON_START_URL;
 
+// Isolated local identities for two-client testing; the normal profile is unaffected.
+const testProfile = process.env.SHINCHAN_PROFILE;
+if (testProfile && /^[a-zA-Z0-9_-]{1,30}$/.test(testProfile)) {
+  const profilePath = join(app.getPath('appData'), 'shinchan-pet-profiles', testProfile);
+  mkdirSync(profilePath, { recursive: true });
+  app.setPath('userData', profilePath);
+}
+
 // Windows 通知需要 AppUserModelID 才能正常弹出（手机连接开启时用它显示访问地址）
 app.setAppUserModelId('com.shinchan.pet');
 
+const walker = new PetWalker();
+const breakReminder = new BreakReminder();
+let walkingReady = false;
+let petPointerHeld = false;
+let lastWalkingState = '';
+function walkingState() {
+  return { enabled: breakReminder.enabled, walking: walker.walking, direction: walker.direction,
+    reminderActive: breakReminder.active, intervalMinutes: breakReminder.intervalMinutes, nextReminderAt: breakReminder.nextReminderAt };
+}
+function publishWalkingState() {
+  lastWalkingState = JSON.stringify(walkingState());
+  win?.webContents.send('walking-state', walkingState());
+  menuWin?.webContents.send('walking-state', walkingState());
+}
+function configureWalking(enabled: boolean, intervalMinutes: number) {
+  if (!Number.isInteger(intervalMinutes) || intervalMinutes < 1 || intervalMinutes > 1440) return { ok: false, error: '请输入 1～1440 之间的整数分钟' };
+  try { writeFileSync(join(app.getPath('userData'), 'pet-walking.json'), JSON.stringify({ enabled, intervalMinutes })); }
+  catch (error) { return { ok: false, error: '提醒设置保存失败，请重试' }; }
+  breakReminder.configure(enabled, intervalMinutes, Date.now());
+  if (!breakReminder.active) walker.restart();
+  publishWalkingState();
+  return { ok: true };
+}
+function toggleWalking() { return configureWalking(!breakReminder.enabled, breakReminder.intervalMinutes); }
+function tickWalking(now: number) {
+  if (!win) return;
+  const bounds = win.getBounds();
+  const available = walkingReady && !dragState && !savedPetBounds && !menuWin && !configWin && !chatWin && win.isVisible();
+  const active = breakReminder.tick(now, available);
+  const state = walker.step({ now, bounds, area: screen.getDisplayMatching(bounds).workArea,
+    enabled: active && walkingReady,
+    blocked: petPointerHeld || !!(dragState || savedPetBounds || menuWin || configWin || chatWin) || !win.isVisible(),
+    scale: petScale,
+  });
+  if (state.bounds.x !== bounds.x || state.bounds.y !== bounds.y ||
+      state.bounds.width !== bounds.width || state.bounds.height !== bounds.height) win.setBounds(state.bounds);
+  const next = JSON.stringify(walkingState());
+  if (next !== lastWalkingState) {
+    lastWalkingState = next;
+    win.webContents.send('walking-state', walkingState());
+  }
+}
+
+let petScale = 1;
+function loadPetScale() {
+  try {
+    const value = JSON.parse(readFileSync(join(app.getPath('userData'), 'pet-scale.json'), 'utf8'));
+    if (typeof value === 'number' && Number.isFinite(value)) petScale = Math.max(0.5, Math.min(2, value));
+  } catch { /* 首次启动使用默认大小 */ }
+}
+function changePetScale(value: number) {
+  if (!win || savedPetBounds || dragState) return;
+  const previous = petScale;
+  const bounds = win.getBounds();
+  petScale = Math.max(0.5, Math.min(2, value));
+  win.webContents.setZoomFactor(petScale);
+  const width = Math.round(bounds.width / previous * petScale);
+  const height = Math.round(bounds.height / previous * petScale);
+  moveWindow(bounds.x + (bounds.width - width) / 2, bounds.y + bounds.height - height, { width, height });
+  walker.restart();
+  try { writeFileSync(join(app.getPath('userData'), 'pet-scale.json'), JSON.stringify(petScale)); }
+  catch (error) { console.error('保存桌宠大小失败', error); }
+}
+
 function createWindow() {
+  loadPetScale();
+  try {
+    const value = JSON.parse(readFileSync(join(app.getPath('userData'), 'pet-walking.json'), 'utf8'));
+    if (typeof value === 'boolean') breakReminder.configure(value, 60, Date.now());
+    else if (value && typeof value.enabled === 'boolean') breakReminder.configure(value.enabled, value.intervalMinutes, Date.now());
+  } catch { /* 默认每小时提醒，重启后重新计时 */ }
   const { workArea } = screen.getPrimaryDisplay();
   // 桌宠窗口默认只有人物大小；气泡/浮层出现时由渲染进程动态调整尺寸
-  const width = 170;
-  const height = 204;
+  const width = Math.round(170 * petScale);
+  const height = Math.round(204 * petScale);
 
   win = new BrowserWindow({
     width,
@@ -94,6 +185,7 @@ function createWindow() {
     },
   });
 
+  win.webContents.on('did-finish-load', () => win?.webContents.setZoomFactor(petScale));
   setCaptureFriendlyAlwaysOnTop(win, true);
 
   if (isDev) {
@@ -116,7 +208,20 @@ function createWindow() {
     }
   });
 
+  // 系统坐标轮询不依赖窗口收到鼠标事件，穿透后仍能恢复人物交互。
+  appliedIgnoreMouse = null;
+  transparentPassthrough = false;
+  const cursorTimer = setInterval(() => {
+    const pet = win;
+    if (!pet || pet.isDestroyed()) return;
+    tickWalking(Date.now());
+    const cursor = screen.getCursorScreenPoint(), bounds = pet.getBounds();
+    const zoom = pet.webContents.getZoomFactor();
+    pet.webContents.send('pet-cursor-position', { x: (cursor.x - bounds.x) / zoom, y: (cursor.y - bounds.y) / zoom });
+  }, 16);
+  cursorTimer.unref();
   win.on('closed', () => {
+    clearInterval(cursorTimer);
     if (chatWin && !chatWin.isDestroyed()) chatWin.close();
     win = null;
   });
@@ -190,6 +295,7 @@ function startDrag() {
       moveWindow(ds.origin.x + (cur.x - ds.cursor.x), ds.origin.y + (cur.y - ds.cursor.y), ds.size);
     }, 10),
   };
+  applyMousePassthrough();
   return { ok: true };
 }
 
@@ -198,7 +304,9 @@ function endDrag() {
   if (dragState) {
     clearInterval(dragState.timer);
     dragState = null;
+    walker.restart();
   }
+  applyMousePassthrough();
   return { bounds: win?.getBounds() ?? null, speed };
 }
 
@@ -231,10 +339,11 @@ function setWindowSize(width: number, height: number) {
   // 因此可用空间至少能容纳人物本体 170×204）
   const availW = Math.min(2 * (cx - target.x), 2 * (target.x + target.width - cx));
   const availH = by - target.y;
-  const w = Math.round(Math.max(Math.min(width, availW), 170));
-  const h = Math.round(Math.max(Math.min(height, availH), 204));
+  const w = Math.round(Math.max(Math.min(width * petScale, availW), 170 * petScale));
+  const h = Math.round(Math.max(Math.min(height * petScale, availH), 204 * petScale));
   if (b.width === w && b.height === h) return b;
   win.setBounds({ x: Math.round(cx - w / 2), y: Math.round(by - h), width: w, height: h });
+  walker.restart();
   return win.getBounds();
 }
 
@@ -244,7 +353,7 @@ function sendTrayCommand(cmd: TrayCommand) {
     app.quit();
   } else if (cmd === 'toggle-passthrough') {
     passthrough = !passthrough;
-    win?.setIgnoreMouseEvents(passthrough, { forward: true });
+    applyMousePassthrough();
   } else if (cmd === 'toggle-top') {
     if (win) setCaptureFriendlyAlwaysOnTop(win, !win.isAlwaysOnTop());
   } else if (cmd === 'show-hide') {
@@ -267,7 +376,7 @@ function openMenuWindow() {
   }
 
   const menuW = 224;
-  const menuH = 276 + (RELEASE_FEATURES.growth ? 44 : 0) + (RELEASE_FEATURES.chat ? 44 : 0);
+  const menuH = 408 + (RELEASE_FEATURES.growth ? 44 : 0) + (RELEASE_FEATURES.chat ? 44 : 0);
   const b = win.getBounds();
   const { workArea } = screen.getPrimaryDisplay();
   // 手机连接入口暂从 UI 隐藏（功能代码保留，恢复时把菜单项加回即可）
@@ -283,7 +392,7 @@ function openMenuWindow() {
   // 水平夹取到工作区内
   mx = Math.max(workArea.x, Math.min(mx, workArea.x + workArea.width - menuW));
 
-  const html = controlMenuHtml();
+  const html = controlMenuHtml(breakReminder.enabled, breakReminder.intervalMinutes);
 
   menuWin = new BrowserWindow({
     x: mx,
@@ -320,8 +429,7 @@ function openMenuWindow() {
     }
   });
 
-  // 失焦 / 关闭时清理
-  menuWin.on('blur', () => menuWin?.close());
+  // 面板保持打开，由关闭按钮、Escape 或再次右键手动收起。
   menuWin.on('closed', () => {
     menuWin = null;
   });
@@ -449,7 +557,7 @@ function closeChatWindow() {
 const NOTE_W = 300;
 const NOTE_H = 340;
 const noteCloseAllowed = new WeakSet<BrowserWindow>();
-const noteResizeOrigins = new Map<string, { cursorY: number; bounds: WinBounds }>();
+const noteResizeOrigins = new Map<string, { cursorX: number; cursorY: number; direction: string; bounds: WinBounds }>();
 let quittingWithSavedNotes = false;
 let savingBeforeQuit = false;
 function noteStickerSources(): NoteStickers {
@@ -490,7 +598,7 @@ function createNoteWindow(note: StickyNote, focus = true) {
   const y = Math.max(wa.y, Math.min(note.bounds?.y ?? pet.y + stagger, wa.y + wa.height - height));
   x = Math.max(wa.x, Math.min(x, wa.x + wa.width - width));
   const nw = new BrowserWindow({
-    x, y, width, height, minWidth: width, maxWidth: width, minHeight: Math.min(96, wa.height),
+    x, y, width, height, minWidth: Math.min(180, wa.width), minHeight: Math.min(96, wa.height),
     frame: false, transparent: true, backgroundColor: '#00000000', hasShadow: false,
     alwaysOnTop: note.pinned, skipTaskbar: true, resizable: true, focusable: true, show: false,
     webPreferences: { contextIsolation: false, nodeIntegration: true },
@@ -936,7 +1044,14 @@ async function runChatTurn(userMessage: string): Promise<{ ok: boolean; response
 }
 
 function handleMenuCommand(cmd: string) {
+  if (cmd === 'toggle-walking') { toggleWalking(); return; }
+  if (cmd === 'size-smaller') { changePetScale(petScale - 0.1); return; }
+  if (cmd === 'size-reset') { changePetScale(1); return; }
+  if (cmd === 'size-larger') { changePetScale(petScale + 0.1); return; }
   switch (cmd) {
+    case 'friends':
+      social?.open();
+      break;
     case 'growth':
       win?.webContents.send('tray-command', 'open-growth');
       break;
@@ -969,6 +1084,14 @@ function createTray() {
 
   const rebuild = () => {
     const menu = Menu.buildFromTemplate([
+      { label: '好友消息 / 加好友', click: () => social?.open() },
+      { label: '桌宠大小', submenu: [
+        { label: '缩小', click: () => changePetScale(petScale - 0.1) },
+        { label: '恢复默认大小', click: () => changePetScale(1) },
+        { label: '放大', click: () => changePetScale(petScale + 0.1) },
+      ] },
+      { label: '护眼走动提醒', type: 'checkbox', checked: breakReminder.enabled, click: () => { toggleWalking(); rebuild(); } },
+      { label: '设置护眼提醒间隔…', click: () => { if (menuWin) menuWin.focus(); else openMenuWindow(); } },
       { label: '便利贴 / 便签夹', click: () => openNoteEditor() },
       ...(RELEASE_FEATURES.growth ? [{ label: '养成系统 🍫', click: () => sendTrayCommand('open-growth') }] : []),
       { type: 'separator' },
@@ -1000,6 +1123,25 @@ function registerIpc() {
     else return { ok: false, error: '未知操作' };
     return { ok: true };
   });
+  ipcMain.handle('walking:configure', (event, minutes: number) => {
+    if (event.sender !== menuWin?.webContents) return { ok: false, error: '无效的设置窗口' };
+    return configureWalking(breakReminder.enabled, minutes);
+  });
+  ipcMain.handle('pet:dismissWalkingReminder', (event) => {
+    if (event.sender !== win?.webContents) return null;
+    breakReminder.dismiss(Date.now());
+    walker.restart();
+    publishWalkingState();
+    return walkingState();
+  });
+  ipcMain.handle('pet:getWalkingState', (event) => event.sender === win?.webContents ? walkingState() : null);
+  ipcMain.on('pet:pointerHeld', (event, held: boolean) => {
+    if (event.sender === win?.webContents && typeof held === 'boolean') petPointerHeld = held;
+  });
+  ipcMain.on('pet:walkingReady', (event, ready: boolean) => {
+    if (event.sender !== win?.webContents || typeof ready !== 'boolean') return;
+    walkingReady = ready;
+  });
   ipcMain.handle('pet:getData', (_e, key: StoreKey) => getData(key));
   ipcMain.handle('pet:setData', (_e, key: StoreKey, value: unknown) => {
     const r = setData(key, value);
@@ -1021,9 +1163,15 @@ function registerIpc() {
     closeChatWindow();
     return { open: false };
   });
-  ipcMain.handle('pet:setIgnoreMouseEvents', (_e, flag: boolean) => {
+  ipcMain.handle('pet:setIgnoreMouseEvents', (event, flag: boolean) => {
+    if (event.sender !== win?.webContents || typeof flag !== 'boolean') return;
     passthrough = flag;
-    win?.setIgnoreMouseEvents(flag, { forward: true });
+    applyMousePassthrough();
+  });
+  ipcMain.on('pet:transparentPassthrough', (event, flag: boolean) => {
+    if (event.sender !== win?.webContents || typeof flag !== 'boolean') return;
+    transparentPassthrough = flag;
+    applyMousePassthrough();
   });
   // 浮层（养成 / 日记）打开：记住桌宠当前位置，把窗口移动到「屏幕工作区内、
   // 完整可见」的位置（居中）。这样即使桌宠贴在屏幕顶部/边缘，浮层也不会被裁切。
@@ -1033,7 +1181,9 @@ function registerIpc() {
       return null;
     }
     if (!savedPetBounds) savedPetBounds = win.getBounds();
+    applyMousePassthrough();
     const { workArea } = screen.getPrimaryDisplay();
+    win.webContents.setZoomFactor(1);
     const w = 380;
     const h = 560;
     const x = Math.max(
@@ -1061,7 +1211,9 @@ function registerIpc() {
     if (!win) return;
     const b = savedPetBounds ?? { x: 0, y: 0, width: 170, height: 204 };
     win.setBounds(b);
+    win.webContents.setZoomFactor(petScale);
     savedPetBounds = null;
+    applyMousePassthrough();
   });
 
   // 渲染进程右键菜单里的指令转发（鼠标穿透切换 / 退出等），复用托盘逻辑
@@ -1069,21 +1221,19 @@ function registerIpc() {
     sendTrayCommand(cmd);
   });
   ipcMain.handle('pet:openMenu', () => openMenuWindow());
-  // 菜单窗口按钮点击：ipcRenderer.send('menu-cmd', cmd) → 执行命令 + 关闭菜单
-  ipcMain.on('menu-cmd', (_e, cmd: string) => {
-    // 先把焦点交回主窗口并关闭菜单，再执行命令——
-    // 否则 win.focus() 会抢走刚创建的配置窗口焦点，触发其 blur 自动关闭
-    win?.show();
-    win?.focus();
-    menuWin?.close();
+  // 面板操作不自动收起，方便连续调整桌宠大小。
+  ipcMain.on('menu-cmd', (event, cmd: string) => {
+    if (event.sender !== menuWin?.webContents) return;
+    if (cmd === 'close-menu') { menuWin?.close(); return; }
     handleMenuCommand(cmd);
   });
 
   // ---------- 便利贴 IPC（只允许窗口修改自己的记录） ----------
   const ownNote = (sender: Electron.WebContents, id: unknown) => typeof id === 'string' && noteWins.get(id)?.webContents === sender;
-  ipcMain.on('note:resize-start', (event, id: string) => {
-    if (!ownNote(event.sender, id)) return;
-    noteResizeOrigins.set(id, { cursorY: screen.getCursorScreenPoint().y, bounds: noteWins.get(id)!.getBounds() });
+  ipcMain.on('note:resize-start', (event, id: string, direction = 'bottom') => {
+    if (!ownNote(event.sender, id) || !['bottom', 'left', 'right'].includes(direction)) return;
+    const cursor = screen.getCursorScreenPoint();
+    noteResizeOrigins.set(id, { cursorX: cursor.x, cursorY: cursor.y, direction, bounds: noteWins.get(id)!.getBounds() });
   });
   ipcMain.on('note:resize-move', (event, id: string) => {
     if (!ownNote(event.sender, id)) return;
@@ -1093,7 +1243,16 @@ function registerIpc() {
     const area = screen.getDisplayMatching(origin.bounds).workArea;
     const maximum = Math.max(96, area.y + area.height - origin.bounds.y);
     const height = Math.round(Math.max(96, Math.min(maximum, origin.bounds.height + screen.getCursorScreenPoint().y - origin.cursorY)));
-    nw.setBounds({ ...origin.bounds, height });
+    const cursor = screen.getCursorScreenPoint();
+    if (origin.direction === 'bottom') nw.setBounds({ ...origin.bounds, height });
+    else {
+      const left = origin.direction === 'left';
+      const right = origin.bounds.x + origin.bounds.width;
+      const maximumWidth = left ? right - area.x : area.x + area.width - origin.bounds.x;
+      const delta = cursor.x - origin.cursorX;
+      const width = Math.round(Math.max(180, Math.min(maximumWidth, origin.bounds.width + (left ? -delta : delta))));
+      nw.setBounds({ ...origin.bounds, width, x: left ? right - width : origin.bounds.x });
+    }
   });
   ipcMain.on('note:resize-end', (event, id: string) => {
     if (!ownNote(event.sender, id)) return;
@@ -1204,6 +1363,10 @@ if (!app.requestSingleInstanceLock()) {
     createWindow();
     createTray();
     registerIpc();
+    social = setupSocial(() => win, count => {
+      win?.webContents.send('friends-unread', count);
+      tray?.setToolTip(count ? `蜡笔小新桌宠 · ${count} 条好友消息/申请未查看` : '蜡笔小新桌宠');
+    });
     // 还原固定在桌面的便利贴
     restorePinnedNotes();
 

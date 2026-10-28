@@ -1,10 +1,11 @@
 // 桌面陪伴主界面：桌宠舞台
 // 职责：点击/拖拽手势识别、形象与气泡展示、情绪指示、场景背景、右键菜单、聊天输入
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
 import type { Emotion, SceneId, CostumeId, AccessoryId, PoseAsset } from '../../shared/types';
 import { RELEASE_FEATURES } from '../../shared/releaseFeatures';
 import Character, { type Pose } from './Character';
 import styles from './PetStage.module.css';
+import { hitsCharacter } from '../data/characterHitTest';
 
 export type Gesture = 'click' | 'dblclick' | 'drag-fall' | 'drag-move';
 
@@ -17,6 +18,7 @@ interface Props {
   pose: Pose;
   poseRun?: number;
   bubble: Bubble | null;
+  breakReminderActive?: boolean;
   emotion: Emotion;
   scene: SceneId;
   costume: CostumeId;
@@ -44,6 +46,7 @@ export default function PetStage({
   pose,
   poseRun = 0,
   bubble,
+  breakReminderActive = false,
   emotion,
   scene,
   costume,
@@ -55,6 +58,13 @@ export default function PetStage({
   chatOpen,
   onChatOpenChange,
 }: Props) {
+  const [friendUnread, setFriendUnread] = useState(0);
+  useEffect(() => {
+    let active = true, received = false;
+    const off = window.petAPI.onFriendsUnread(count => { received = true; setFriendUnread(count); });
+    void window.petAPI.friendsUnread().then(count => { if (active && !received) setFriendUnread(count); });
+    return () => { active = false; off(); };
+  }, []);
   const openChat = useCallback(() => {
     onChatOpenChange(true);
   }, [onChatOpenChange]);
@@ -64,6 +74,9 @@ export default function PetStage({
     e.stopPropagation();
   }, []);
 
+  const stageRef = useRef<HTMLDivElement>(null);
+  const chatButtonRef = useRef<HTMLButtonElement>(null);
+  const characterRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{
     /** 按下时鼠标在窗口内的位置（用于区分点击与拖动） */
     grabClient: { x: number; y: number };
@@ -77,6 +90,8 @@ export default function PetStage({
 
   /** 结束主进程拖拽（不触发任何手势反应，用于异常清理） */
   const abortDrag = useCallback(() => {
+    dragRef.current = null;
+    window.petAPI.setPetPointerHeld(false);
     if (!dragActiveRef.current) return;
     dragActiveRef.current = false;
     onDragPose(false);
@@ -91,10 +106,12 @@ export default function PetStage({
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (e.button !== 0) return;
+      if (!characterRef.current || !hitsCharacter(characterRef.current, e.clientX, e.clientY)) return;
       // 上一次拖拽若未正常结束（pointerup 丢失），先终结它，
       // 否则主进程会残留一个永久跟随鼠标的拖拽循环
       abortDrag();
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      window.petAPI.setPetPointerHeld(true);
       dragRef.current = {
         grabClient: { x: e.clientX, y: e.clientY },
         moved: false,
@@ -124,6 +141,7 @@ export default function PetStage({
     const d = dragRef.current;
     dragRef.current = null;
     if (!d) return;
+    window.petAPI.setPetPointerHeld(false);
     // 位移极小且时间短 → 视为轻点，进一步判定单击 / 双击
     if (!d.moved) {
       if (performance.now() - d.downT >= 500) return;
@@ -165,11 +183,39 @@ export default function PetStage({
     };
   }, [abortDrag]);
 
+  useEffect(() => {
+    let lastIgnore: boolean | undefined;
+    let lastCharacterHover = -Infinity;
+    let chatVisible = false;
+    const off = window.petAPI.onCursorPosition(({ x, y }) => {
+      const character = !!characterRef.current && hitsCharacter(characterRef.current, x, y);
+      const now = performance.now();
+      if (character) lastCharacterHover = now;
+      const button = chatButtonRef.current?.getBoundingClientRect();
+      const overChat = chatVisible && !!button && x >= button.left && x <= button.right && y >= button.top && y <= button.bottom;
+      const body = characterRef.current?.getBoundingClientRect();
+      const nearby = !!body && x >= body.left - 20 && x <= body.right + 38 && y >= body.top - 20 && y <= body.bottom + 20;
+      // 只在真实人物像素或已显示的聊天按钮上显示；短暂宽限方便跨过两者之间的间隙。
+      chatVisible = !dragRef.current && (character || overChat || (nearby && now - lastCharacterHover < 250));
+      if (stageRef.current) stageRef.current.dataset.characterHover = String(chatVisible);
+      const element = document.elementFromPoint(x, y);
+      const control = element?.closest('button, a, input, textarea, select, [role="button"], [data-pet-interactive]');
+      // 按下到松手期间保留捕获，不能因拖到人物轮廓外而中断。
+      const ignore = !dragRef.current && !control && !character;
+      if (ignore !== lastIgnore) {
+        lastIgnore = ignore;
+        window.petAPI.setTransparentPassthrough(ignore);
+      }
+    });
+    return () => { off(); window.petAPI.setTransparentPassthrough(false); };
+  }, []);
+
   const poseAnim = POSE_ANIM[pose] ?? '';
 
   return (
     <div
       className={`${styles.stage} ${sceneClass(scene)}`}
+      ref={stageRef}
       data-pet-stage
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -206,15 +252,29 @@ export default function PetStage({
       {/* 聊天回复固定在侧边输入条上方，允许滚动与选中文字。 */}
       {bubble && !chatOpen && (
         <div
+          data-pet-interactive
           className={`${styles.bubble} ${bubble.kind === 'angry' ? styles.bubbleAngry : ''}`}
         >
           {bubble.text}
         </div>
       )}
 
+      {breakReminderActive && (
+        <div className={styles.breakReminder} role="status" data-break-reminder title="放松一下眼睛吧～ 双击小新结束本次提醒">
+          放松一下眼睛～ · 双击结束
+        </div>
+      )}
+
       {/* 聊天图标（收起态） */}
+      {friendUnread > 0 && (
+        <button className={styles.friendMail} onPointerDown={stopStage} onClick={() => { void window.petAPI.openFriends(); }} title="朋友来信啦" aria-label={`${friendUnread} 条好友消息或申请，打开好友信箱`}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M3 6h18v14H3zM3 6l9 7 9-7" /></svg>
+          <span>{friendUnread > 99 ? '99+' : friendUnread}</span>
+        </button>
+      )}
       {RELEASE_FEATURES.chatHover && !chatOpen && (
         <button
+          ref={chatButtonRef}
           className={styles.chatIcon}
           onPointerDown={stopStage}
           onClick={openChat}
@@ -230,7 +290,7 @@ export default function PetStage({
 
       {/* 桌宠本体（拖拽热区） */}
       <div className={styles.petAnchor}>
-        <div className={`${styles.petWrap} ${poseAnim}`}>
+        <div ref={characterRef} className={`${styles.petWrap} ${poseAnim}`}>
           <Character key={`${pose}-${poseRun}`} pose={pose} costume={costume} accessory={accessory} poseAsset={poseAsset} />
         </div>
       </div>

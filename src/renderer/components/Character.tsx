@@ -18,7 +18,9 @@ export type Pose =
   | 'curious'
   | 'eat'
   | 'dance'
-  | 'drag';
+  | 'drag'
+  | 'walk-left'
+  | 'walk-right';
 
 interface Props {
   pose: Pose;

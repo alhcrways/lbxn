@@ -1,6 +1,6 @@
 // preload：通过 contextBridge 暴露安全 API 给渲染进程
 import { contextBridge, ipcRenderer } from 'electron';
-import type { StoreKey, TrayCommand, WinBounds, LogEntry, ChatMessage, CostumeAssets } from '../shared/types';
+import type { StoreKey, TrayCommand, WinBounds, LogEntry, ChatMessage, CostumeAssets, WalkingState } from '../shared/types';
 
 const api = {
   // ---- 数据 ----
@@ -11,6 +11,15 @@ const api = {
     ipcRenderer.invoke('pet:appendLog', entry) as Promise<{ result: LogEntry; ok: boolean; error?: string }>,
   updateLogNote: (id: string, note: string) =>
     ipcRenderer.invoke('pet:updateLogNote', id, note) as Promise<{ ok: boolean; error?: string }>,
+  dismissWalkingReminder: () => ipcRenderer.invoke('pet:dismissWalkingReminder') as Promise<WalkingState>,
+  getWalkingState: () => ipcRenderer.invoke('pet:getWalkingState') as Promise<WalkingState>,
+  setPetPointerHeld: (held: boolean) => ipcRenderer.send('pet:pointerHeld', held),
+  setWalkingReady: (ready: boolean) => ipcRenderer.send('pet:walkingReady', ready),
+  onWalkingState: (cb: (state: WalkingState) => void) => {
+    const listener = (_event: unknown, state: WalkingState) => cb(state);
+    ipcRenderer.on('walking-state', listener);
+    return () => { ipcRenderer.off('walking-state', listener); };
+  },
   // ---- 窗口 ----
   dragStart: () => ipcRenderer.invoke('pet:dragStart') as Promise<{ ok: boolean }>,
   dragEnd: () =>
@@ -30,6 +39,12 @@ const api = {
     ipcRenderer.on('chat-status', listener);
     return () => { ipcRenderer.off('chat-status', listener); };
   },
+  setTransparentPassthrough: (flag: boolean) => ipcRenderer.send('pet:transparentPassthrough', flag),
+  onCursorPosition: (cb: (point: { x: number; y: number }) => void) => {
+    const listener = (_event: unknown, point: { x: number; y: number }) => cb(point);
+    ipcRenderer.on('pet-cursor-position', listener);
+    return () => { ipcRenderer.off('pet-cursor-position', listener); };
+  },
   setIgnoreMouseEvents: (flag: boolean) => ipcRenderer.invoke('pet:setIgnoreMouseEvents', flag),
   /** 打开浮层：记住桌宠位置并把窗口移到屏幕内完整可见处 */
   openOverlay: () => ipcRenderer.invoke('pet:openOverlay') as Promise<WinBounds | null>,
@@ -39,6 +54,13 @@ const api = {
   command: (cmd: TrayCommand) => ipcRenderer.invoke('pet:command', cmd),
   /** 右键 → 弹出独立菜单窗口 */
   openMenu: () => ipcRenderer.invoke('pet:openMenu'),
+  openFriends: () => ipcRenderer.invoke('pet:openFriends'),
+  friendsUnread: () => ipcRenderer.invoke('pet:friendsUnread') as Promise<number>,
+  onFriendsUnread: (cb: (count: number) => void) => {
+    const listener = (_event: unknown, count: number) => cb(count);
+    ipcRenderer.on('friends-unread', listener);
+    return () => { ipcRenderer.off('friends-unread', listener); };
+  },
   quit: () => ipcRenderer.invoke('pet:quit'),
   /** 扫描 character/{costume}/ 目录，返回该形象资源清单（姿态单图/动画 + 随机池 + 时段池） */
   listCostumeAssets: (costume: string) =>

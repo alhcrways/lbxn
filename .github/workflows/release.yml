@@ -9,37 +9,39 @@ permissions:
   contents: write
 
 jobs:
-  windows-portable:
+  windows-release:
     runs-on: windows-latest
-
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-
       - name: Install dependencies
         run: npm ci
-
-      - name: Check TypeScript
-        run: npm run typecheck
-
-      - name: Build portable executable
-        run: npm run dist:portable
-
-      - name: Publish GitHub Release
+      - name: Check TypeScript and reminder logic
+        run: |
+          npm run typecheck
+          npm run test:reminder
+          npm run test:social
+      - name: Build installer and portable executable
+        run: npm run dist -- --publish never
+      - name: Check packaged window integration
+        run: node scripts/check-resizing.cjs
+      - name: Publish latest GitHub Release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $asset = Get-ChildItem release -Filter "*-Portable.exe" | Select-Object -First 1
-          if (-not $asset) { throw "Portable executable was not generated." }
-
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($env:GITHUB_REF_NAME -ne "v$version") { throw "Tag and package version do not match." }
+          $installer = Get-Item -LiteralPath "release/Shinchan-Pet-$version-Setup.exe"
+          $portable = Get-Item -LiteralPath "release/Shinchan-Pet-$version-Portable.exe"
           gh release create $env:GITHUB_REF_NAME `
-            $asset.FullName `
+            $installer.FullName $portable.FullName `
+            --target $env:GITHUB_SHA `
+            --latest `
             --title "蜡笔小新桌宠 $env:GITHUB_REF_NAME" `
-            --notes "Windows 10/11 64 位便携版。下载 Portable.exe 后直接运行，无需安装 Node.js。"
+            --notes-file "docs/releases/$env:GITHUB_REF_NAME.md"

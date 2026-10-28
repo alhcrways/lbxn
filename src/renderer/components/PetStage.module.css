@@ -4,7 +4,7 @@
   height: 100%;
   display: block;
   overflow: hidden;
-  cursor: grab;
+  cursor: default;
 }
 
 /* ============ 场景背景 ============ */
@@ -227,22 +227,43 @@
   box-shadow: 0 1px 4px rgba(62, 39, 35, 0.08);
   z-index: 7;
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
   transition: opacity 0.18s ease, transform 0.18s ease, background 0.15s;
 }
 
-.stage:hover .chatIcon,
-.stage:focus-within .chatIcon {
+.stage[data-character-hover="true"] .chatIcon {
+  visibility: visible;
   opacity: 1;
   pointer-events: auto;
   transform: translateY(0);
-  transition-delay: 0.15s;
+  transition-delay: 0s;
 }
 
 .chatIcon:hover {
   background: var(--accent);
   color: var(--ink);
 }
+
+.friendMail {
+  position: absolute;
+  bottom: 57px;
+  left: calc(50% + 47px);
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 5px;
+  border: 1px solid #947253;
+  border-radius: 9px;
+  background: #f8d56b;
+  color: #594332;
+  font-size: 10px;
+  cursor: pointer;
+  box-shadow: 0 2px 3px #59433220;
+}
+
+.friendMail:focus-visible { outline: 2px solid #6b919c; outline-offset: 2px; }
 
 .chatIcon:focus-visible {
   outline: 2px solid #8d7665;
@@ -255,13 +276,6 @@
   }
 }
 
-@media (hover: none) {
-  .chatIcon {
-    opacity: 1;
-    pointer-events: auto;
-    transform: none;
-  }
-}
 
 /* ============ 桌宠与姿态动画 ============ */
 .petAnchor {
@@ -362,3 +376,26 @@
     transform: scale(1.06) translateY(2px);
   }
 }
+
+.breakReminder {
+  position: absolute;
+  bottom: 164px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 12px);
+  padding: 4px 9px;
+  border: 1px solid #947253;
+  border-radius: 6px;
+  background: #fffdf3ed;
+  color: #594332;
+  box-shadow: none;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  z-index: 7;
+}
+@media (max-height: 220px) { .breakReminder { top: 6px; bottom: auto; font-size: 10px; padding: 3px 6px; } }

@@ -14,6 +14,11 @@ electron_output.txt
 
 # 构建时生成
 assets/note-window.html
+assets/social-window.html
+assets/social-ui.js
+dist-social/
+.social-data/
+.social-test-data/
 
 # 当前 MVP 未启用的历史/实验素材（文件仍保留在本机）
 /小新.png
@@ -47,3 +52,7 @@ assets/note-window.html
 /scripts/check-note-ui.cjs
 /scripts/check-note-url.cjs
 /scripts/check-release-ui.cjs
+
+# 行走素材保留当前配色源图，旧的生成候选仅保留在本机
+/assets/walking/walk-sheet*.png
+!/assets/walking/walk-sheet-default-palette.png

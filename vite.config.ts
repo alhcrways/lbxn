@@ -11,6 +11,10 @@ const releaseCharacterFiles = [
   'default/idle.png',
   'default/shy.png',
   'default/thinking.webp',
+  ...['left', 'right'].flatMap(direction => [
+    `default/walk-${direction}/frame.txt`,
+    ...Array.from({ length: 6 }, (_, index) => `default/walk-${direction}/${String(index + 1).padStart(2, '0')}.png`),
+  ]),
 ];
 
 // 本机保留了许多尚未启用、且已被 .gitignore 排除的动作素材。Vite 默认会把

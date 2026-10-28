@@ -133,3 +133,13 @@ export interface ServerAuth {
 
 /** 托盘 / 右键菜单指令 */
 export type TrayCommand = 'open-growth' | 'open-chat' | 'toggle-passthrough' | 'toggle-top' | 'show-hide' | 'quit';
+
+/** 自由散步状态，由主进程的位置更新驱动动画。 */
+export interface WalkingState {
+  reminderActive: boolean;
+  intervalMinutes: number;
+  nextReminderAt: number | null;
+  enabled: boolean;
+  walking: boolean;
+  direction: 'left' | 'right';
+}

@@ -1,6 +1,6 @@
 {
   "name": "shinchan-pet",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "蜡笔小新桌宠：支持聊天与多便利贴的 Windows 桌面宠物",
   "main": "dist-electron/main.cjs",
   "author": "shinchan-pet",
@@ -15,7 +15,14 @@
     "build": "npm run build:main && vite build",
     "start": "npm run build:main && vite build && node scripts/launch.mjs",
     "dist": "npm run build && electron-builder --win nsis portable",
-    "dist:portable": "npm run build && electron-builder --win portable"
+    "dist:portable": "npm run build && electron-builder --win portable",
+    "social:build": "esbuild src/social/server-entry.ts --bundle --platform=node --format=cjs --outfile=dist-social/server.cjs",
+    "social:server": "npm run social:build && node dist-social/server.cjs",
+    "test:social": "node scripts/test-social.mjs",
+    "test:social:ui": "npm run build:main && node scripts/check-social-ui.mjs",
+    "start:alice": "cross-env SHINCHAN_PROFILE=alice node scripts/launch.mjs",
+    "start:bob": "cross-env SHINCHAN_PROFILE=bob node scripts/launch.mjs",
+    "test:reminder": "node scripts/check-break-reminder.cjs && node scripts/check-walking.cjs"
   },
   "devDependencies": {
     "@tabler/icons-react": "^3.24.0",
@@ -47,7 +54,9 @@
     "files": [
       "dist/**",
       "dist-electron/**",
-      "assets/**"
+      "assets/**",
+      "!assets/walking/**",
+      "!assets/note-mascots.png"
     ],
     "win": {
       "icon": "assets/icon.png",
