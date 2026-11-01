@@ -25,11 +25,14 @@ jobs:
         run: |
           npm run typecheck
           npm run test:reminder
+          npm run test:logging
           npm run test:social
       - name: Build installer and portable executable
         run: npm run dist -- --publish never
       - name: Check packaged window integration
-        run: node scripts/check-resizing.cjs
+        run: |
+          node scripts/check-resizing.cjs
+          npm run test:packaged-menu
       - name: Publish latest GitHub Release
         shell: pwsh
         env:

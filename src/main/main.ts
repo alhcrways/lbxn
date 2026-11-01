@@ -18,8 +18,11 @@ import { RELEASE_FEATURES } from '../shared/releaseFeatures';
 import { SHINCHAN_PERSONA } from '../shared/persona';
 import { BreakReminder } from './breakReminder';
 import { PetWalker } from './petWalking';
+import { guardConsolePipes } from './logging';
 import { setupSocial } from './socialWindow';
 import type { StoreKey, TrayCommand, WinBounds, LlmConfig, ChatMessage, StickyNote, NoteColor, CostumeAssets, ServerAuth, OutfitData, PetState } from '../shared/types';
+
+guardConsolePipes();
 
 let win: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -1177,7 +1180,6 @@ function registerIpc() {
   // 完整可见」的位置（居中）。这样即使桌宠贴在屏幕顶部/边缘，浮层也不会被裁切。
   ipcMain.handle('pet:openOverlay', () => {
     if (!win) {
-      console.log('[openOverlay] FAIL: win is null');
       return null;
     }
     if (!savedPetBounds) savedPetBounds = win.getBounds();
@@ -1194,7 +1196,6 @@ function registerIpc() {
       workArea.y,
       Math.min(Math.round(workArea.y + (workArea.height - h) / 2), workArea.y + workArea.height - h),
     );
-    console.log('[openOverlay] moving to', { x, y, w, h, workArea });
     win.setBounds({ x, y, width: w, height: h });
     // 右键菜单是独立 BrowserWindow 且 focusable，关闭后焦点会跑到桌面/其他应用，
     // 主窗口虽 alwaysOnTop 但未激活会被遮挡——这里显式 show + focus + moveTop 强制置顶
@@ -1202,7 +1203,6 @@ function registerIpc() {
     win.show();
     win.focus();
     win.moveTop();
-    console.log('[openOverlay] done, bounds=', win.getBounds(), 'alwaysOnTop=', win.isAlwaysOnTop(), 'visible=', win.isVisible());
     return savedPetBounds;
   });
 
@@ -1370,10 +1370,12 @@ if (!app.requestSingleInstanceLock()) {
     // 还原固定在桌面的便利贴
     restorePinnedNotes();
 
-    // ===== 临时调试：转发渲染进程 console 到主进程 stdout =====
-    win?.webContents.on('console-message', (_e, _level, message) => {
-      console.log('[renderer]', message);
-    });
+    // 只在开发环境转发日志；正式桌面程序不能依赖启动器的控制台。
+    if (isDev) {
+      win?.webContents.on('console-message', (_e, _level, message) => {
+        console.log('[renderer]', message);
+      });
+    }
   });
 }
 
