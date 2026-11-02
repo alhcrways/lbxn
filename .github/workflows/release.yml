@@ -33,6 +33,7 @@ jobs:
         run: |
           node scripts/check-resizing.cjs
           npm run test:packaged-menu
+          npm run test:portable
       - name: Publish latest GitHub Release
         shell: pwsh
         env:

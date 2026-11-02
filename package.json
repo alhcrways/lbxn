@@ -1,6 +1,6 @@
 {
   "name": "shinchan-pet",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "蜡笔小新桌宠：支持聊天与多便利贴的 Windows 桌面宠物",
   "main": "dist-electron/main.cjs",
   "author": "shinchan-pet",
@@ -24,7 +24,8 @@
     "start:bob": "cross-env SHINCHAN_PROFILE=bob node scripts/launch.mjs",
     "test:reminder": "node scripts/check-break-reminder.cjs && node scripts/check-walking.cjs",
     "test:logging": "node scripts/check-logging.cjs",
-    "test:packaged-menu": "node scripts/check-packaged-menu.mjs"
+    "test:packaged-menu": "node scripts/check-packaged-menu.mjs",
+    "test:portable": "node scripts/check-portable.cjs"
   },
   "devDependencies": {
     "@tabler/icons-react": "^3.24.0",
@@ -35,8 +36,9 @@
     "concurrently": "^9.1.0",
     "cross-env": "^7.0.3",
     "electron": "^33.2.0",
-    "electron-builder": "^26.15.3",
+    "electron-builder": "26.15.3",
     "esbuild": "^0.24.2",
+    "playwright-core": "1.62.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "typescript": "^5.7.2",
@@ -44,7 +46,8 @@
     "wait-on": "^8.0.1"
   },
   "comments": {
-    "packaging": "npm run dist:portable 生成免安装单文件版本；npm run dist 同时生成安装版和便携版。"
+    "packaging": "npm run dist:portable 生成免安装单文件版本；npm run dist 同时生成安装版和便携版。",
+    "portableIsolation": "electron-builder 26.15.3 的实现中 unpackDirName: true 才会使用每次启动独立的 $PLUGINSDIR/app（与选项文档的 false 相反）。固定构建器版本并通过真实 EXE 重复启动测试，避免第二个启动器清理正在运行的资源。"
   },
   "build": {
     "appId": "com.shinchan.pet",
@@ -73,6 +76,7 @@
       "allowToChangeInstallationDirectory": true
     },
     "portable": {
+      "unpackDirName": true,
       "artifactName": "Shinchan-Pet-${version}-Portable.${ext}"
     }
   }

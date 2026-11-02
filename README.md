@@ -20,7 +20,7 @@
 
 ### AI 聊天
 
-- 鼠标靠近小新时显示聊天入口
+- 鼠标放到小新人物身上时显示聊天入口；聊天窗口已打开时也可点击图标再次唤起
 - 聊天框独立显示，不会改变小新的位置或造成画面闪动
 - 回复显示在输入框上方，聊天与桌宠状态自然联动
 - 支持 DeepSeek、Qwen、Kimi、智谱、豆包
@@ -86,7 +86,7 @@
 
 普通用户只需要下载一个 `.exe` 文件，**不需要安装 Node.js，也不需要安装其他运行环境**。
 
-1. 下载 [Windows 安装版](https://github.com/alhcrways/lbxn/releases/latest/download/Shinchan-Pet-1.0.5-Setup.exe)，或点击 [直接下载 Windows 便携版](https://github.com/alhcrways/lbxn/releases/latest/download/Shinchan-Pet-1.0.5-Portable.exe)。
+1. 下载 [Windows 安装版](https://github.com/alhcrways/lbxn/releases/latest/download/Shinchan-Pet-1.0.6-Setup.exe)，或点击 [直接下载 Windows 便携版](https://github.com/alhcrways/lbxn/releases/latest/download/Shinchan-Pet-1.0.6-Portable.exe)。
 2. 双击下载好的 `.exe`，小新就会出现在桌面上。
 
 需要查找旧版本时，可以前往 [历史版本页面](https://github.com/alhcrways/lbxn/releases)。
