@@ -1,6 +1,7 @@
 import { HERO_PALETTE } from './heroPalette';
 // 原生独立窗口共用动感超人配色与卡通面板样式。
 export const HERO_PANEL_CSS = `
+head,head *,style,script,title,meta,link{display:none!important}
 *{box-sizing:border-box}html,body{height:100%;margin:0}
 body{padding:8px;background:transparent;color:#594332;font:13px/1.5 "Microsoft YaHei",sans-serif}
 button,input,select{font:inherit}button{cursor:pointer;color:inherit}button:disabled{opacity:.55;cursor:wait}

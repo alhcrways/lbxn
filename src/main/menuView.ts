@@ -13,6 +13,7 @@ export function controlMenuHtml(walkingEnabled = true, intervalMinutes = 60) {
     ['quit', '<svg viewBox="0 0 24 24"><path d="M12 20S4 15.6 4 9.5A4.5 4.5 0 0 1 12 6a4.5 4.5 0 0 1 8 3.5C20 15.6 12 20 12 20z"/></svg>', '退出'],
   ];
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>春日部控制台</title><style>
+    head,head *,style,script,title,meta,link{display:none!important}
     *{box-sizing:border-box;margin:0;padding:0}
     html,body{width:100%;height:100%;overflow:auto}body{padding:8px;background:transparent;color:#594332;font:13px/1.5 "Microsoft YaHei UI","Microsoft YaHei",sans-serif;cursor:default}
     .menu{padding:10px;background:${HERO_PALETTE.blue};border:2.5px solid #594332;border-radius:18px 14px 20px 16px;box-shadow:0 3px 0 #59433230}

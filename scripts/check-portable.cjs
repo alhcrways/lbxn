@@ -94,7 +94,32 @@ async function freePort() {
       await menu.locator('[data-command="close-menu"]').click();
       await waitFor(() => menu.isClosed(), 'manual menu close');
     }
-    console.log('PASS: real portable EXE survives repeated launches with intact runtime, styled menu, repeated resizing and manual close');
+    // Simulate Windows/cleanup software removing unlocked Chromium resources
+    // after the app has been running for a while. The next menu open must
+    // restore them from the copy kept inside app.asar.
+    const simulated = [];
+    for (const file of resources.slice(0, 3)) {
+      const original = path.join(runtime, file), missing = `${original}.simulated-missing`;
+      fs.renameSync(original, missing);
+      simulated.push(missing);
+    }
+    assert.ok(resources.slice(0, 3).every(file => !fs.existsSync(path.join(runtime, file))));
+    menu = await openMenu();
+    await waitFor(() => resources.slice(0, 3).every(file => fs.existsSync(path.join(runtime, file))), 'automatic runtime resource repair');
+    const repaired = await menu.evaluate(() => ({
+      text: document.documentElement.innerText,
+      head: getComputedStyle(document.head).display,
+      style: getComputedStyle(document.querySelector('style')).display,
+    }));
+    await menu.screenshot({ path: path.join(output, 'menu-after-resource-repair.png') });
+    assert.ok(!/box-sizing|font:|ipcRenderer|const |EPIPE/.test(repaired.text));
+    assert.equal(repaired.head, 'none');
+    assert.equal(repaired.style, 'none');
+    resources.slice(0, 3).forEach((file, i) => assert.equal(require('node:crypto').createHash('sha256').update(fs.readFileSync(path.join(runtime, file))).digest('hex'), hashes[i]));
+    for (const file of simulated) fs.unlinkSync(file);
+    await menu.locator('[data-command="close-menu"]').click();
+    await waitFor(() => menu.isClosed(), 'repaired menu close');
+    console.log('PASS: real portable EXE survives repeated launches and simulated runtime cleanup; resources self-repair before a styled menu opens');
   } finally {
     if (pet && !pet.isClosed()) await pet.evaluate(() => window.petAPI.quit()).catch(() => {});
     if (browser) await browser.close();

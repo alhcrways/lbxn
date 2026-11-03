@@ -86,7 +86,7 @@
 
 普通用户只需要下载一个 `.exe` 文件，**不需要安装 Node.js，也不需要安装其他运行环境**。
 
-1. 下载 [Windows 安装版](https://github.com/alhcrways/lbxn/releases/latest/download/Shinchan-Pet-1.0.6-Setup.exe)，或点击 [直接下载 Windows 便携版](https://github.com/alhcrways/lbxn/releases/latest/download/Shinchan-Pet-1.0.6-Portable.exe)。
+1. 下载 [Windows 安装版](https://github.com/alhcrways/lbxn/releases/latest/download/Shinchan-Pet-1.0.7-Setup.exe)，或点击 [直接下载 Windows 便携版](https://github.com/alhcrways/lbxn/releases/latest/download/Shinchan-Pet-1.0.7-Portable.exe)。
 2. 双击下载好的 `.exe`，小新就会出现在桌面上。
 
 需要查找旧版本时，可以前往 [历史版本页面](https://github.com/alhcrways/lbxn/releases)。

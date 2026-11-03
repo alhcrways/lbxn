@@ -1,4 +1,14 @@
 /* ==== 复古童趣风 · 设计令牌（来自 PRD §6） ==== */
+head,
+head *,
+style,
+script,
+title,
+meta,
+link {
+  display: none !important;
+}
+
 :root {
   /* 颜色 */
   --primary: #cf4035;

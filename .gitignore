@@ -16,6 +16,7 @@ electron_output.txt
 assets/note-window.html
 assets/social-window.html
 assets/social-ui.js
+/assets/runtime-backup/
 dist-social/
 .social-data/
 .social-test-data/

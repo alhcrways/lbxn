@@ -1,5 +1,16 @@
 import { build } from 'esbuild';
-import { writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+// Portable builds run from a temporary directory. Some Windows cleanup tools can
+// remove Chromium's root .pak files while Electron is still alive. Keep compact
+// copies inside app.asar so the main process can restore them before opening a
+// new renderer window.
+const runtimeBackupDir = resolve('assets/runtime-backup');
+mkdirSync(runtimeBackupDir, { recursive: true });
+for (const file of ['resources.pak', 'chrome_100_percent.pak', 'chrome_200_percent.pak']) {
+  copyFileSync(resolve('node_modules/electron/dist', file), resolve(runtimeBackupDir, `${file}.bin`));
+}
 
 // Generate one local shell; note contents/images arrive through IPC, not a data URL.
 const noteView = await build({

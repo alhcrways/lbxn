@@ -1,8 +1,8 @@
 // 蜡笔小新桌宠 · 主进程
 // 职责：透明置顶无边框窗口、托盘菜单、窗口移动/穿透控制、本地数据 IPC
 import { app, BrowserWindow, Tray, Menu, screen, ipcMain, nativeImage, dialog, Notification } from 'electron';
-import { join, relative, resolve, sep } from 'node:path';
-import { readdirSync, statSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { dirname, join, relative, resolve, sep } from 'node:path';
+import { copyFileSync, existsSync, readdirSync, statSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import * as http from 'node:http';
 import * as os from 'node:os';
@@ -76,6 +76,32 @@ if (process.env.SHINCHAN_NO_GPU === '1') {
 }
 
 const isDev = !!process.env.ELECTRON_START_URL;
+
+const CHROMIUM_RUNTIME_ASSETS = ['resources.pak', 'chrome_100_percent.pak', 'chrome_200_percent.pak'] as const;
+/**
+ * A self-extracting Portable EXE lives in %TEMP%. Windows cleanup software may
+ * remove Electron's unlocked .pak files while the main process and app.asar are
+ * still in use. Restore exact build-time copies before creating another renderer.
+ */
+function ensureChromiumRuntimeAssets() {
+  if (isDev) return true;
+  const runtimeDir = dirname(process.execPath);
+  const backupDir = join(__dirname, '../assets/runtime-backup');
+  try {
+    for (const file of CHROMIUM_RUNTIME_ASSETS) {
+      const destination = join(runtimeDir, file);
+      const backup = join(backupDir, `${file}.bin`);
+      if (!existsSync(backup)) throw new Error(`缺少内置运行资源：${file}`);
+      if (!existsSync(destination) || statSync(destination).size !== statSync(backup).size) {
+        copyFileSync(backup, destination);
+      }
+    }
+    return true;
+  } catch (error) {
+    console.error('[runtime-assets] restore failed', error);
+    return false;
+  }
+}
 
 // Isolated local identities for two-client testing; the normal profile is unaffected.
 const testProfile = process.env.SHINCHAN_PROFILE;
@@ -378,6 +404,7 @@ function openMenuWindow() {
     return;
   }
 
+  ensureChromiumRuntimeAssets();
   const menuW = 224;
   const menuH = 408 + (RELEASE_FEATURES.growth ? 44 : 0) + (RELEASE_FEATURES.chat ? 44 : 0);
   const b = win.getBounds();
@@ -448,6 +475,7 @@ function openLlmConfigWindow() {
     return;
   }
 
+  ensureChromiumRuntimeAssets();
   const cfg = getData('llmConfig') as LlmConfig;
 
   const cw = 320;
@@ -517,6 +545,7 @@ function openChatWindow() {
     chatWin.focus();
     return true;
   }
+  ensureChromiumRuntimeAssets();
   chatWin = new BrowserWindow({
     width: CHAT_WINDOW_SIZE.width,
     height: CHAT_WINDOW_SIZE.height,
@@ -1354,6 +1383,10 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.whenReady().then(() => {
+    ensureChromiumRuntimeAssets();
+    const runtimeRepairTimer = setInterval(ensureChromiumRuntimeAssets, 10_000);
+    runtimeRepairTimer.unref();
+    app.once('before-quit', () => clearInterval(runtimeRepairTimer));
     initStores();
     // 首次启动生成手机连接访问令牌（固定持久化，手机收藏的地址长期有效）
     const auth = getData('serverAuth') as ServerAuth;
