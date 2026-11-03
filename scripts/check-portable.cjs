@@ -116,7 +116,11 @@ async function freePort() {
     assert.equal(repaired.head, 'none');
     assert.equal(repaired.style, 'none');
     resources.slice(0, 3).forEach((file, i) => assert.equal(require('node:crypto').createHash('sha256').update(fs.readFileSync(path.join(runtime, file))).digest('hex'), hashes[i]));
-    for (const file of simulated) fs.unlinkSync(file);
+    // The portable launcher's isolated temp directory owns these renamed test
+    // files and removes them after the app exits. Deleting them while Chromium
+    // is still alive is flaky on Windows CI because ResourceBundle may retain a
+    // handle even though the original path was successfully restored.
+    assert.equal(simulated.length, 3);
     await menu.locator('[data-command="close-menu"]').click();
     await waitFor(() => menu.isClosed(), 'repaired menu close');
     console.log('PASS: real portable EXE survives repeated launches and simulated runtime cleanup; resources self-repair before a styled menu opens');
